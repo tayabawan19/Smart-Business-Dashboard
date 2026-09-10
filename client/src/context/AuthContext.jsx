@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -7,16 +7,10 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured } from '../firebase/firebase';
+import { useAuth } from './useAuth';
 
-const AuthContext = createContext(null);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const AuthContext = createContext(null);
+export { useAuth };
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -49,7 +43,6 @@ export const AuthProvider = ({ children }) => {
    */
   const signup = async (email, password) => {
     if (!isFirebaseConfigured || !auth) {
-      // Demo signup mode
       const mockUser = {
         uid: 'demo-' + Date.now(),
         email: email,
@@ -68,7 +61,6 @@ export const AuthProvider = ({ children }) => {
    */
   const login = async (email, password) => {
     if (!isFirebaseConfigured || !auth) {
-      // Demo login mode
       const mockUser = {
         uid: 'demo-' + Date.now(),
         email: email,
@@ -87,7 +79,6 @@ export const AuthProvider = ({ children }) => {
    */
   const loginWithGoogle = async () => {
     if (!isFirebaseConfigured || !auth || !googleProvider) {
-      // Demo Google login
       const mockUser = {
         uid: 'demo-google-' + Date.now(),
         email: 'alex.founder@company.com',
