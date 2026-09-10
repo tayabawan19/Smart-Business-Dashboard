@@ -33,11 +33,11 @@ const CustomTooltip = ({ active, payload, label }) => {
 export const LineChartCard = ({ chart }) => {
   if (!chart || !chart.data || chart.data.length === 0) return null;
 
-  const gradientId = `lineGrad_${chart.id || 'default'}`;
+  const gradientId = `lineGrad_${chart.id ? chart.id.replace(/[^a-zA-Z0-9]/g, '_') : 'default'}`;
 
   return (
     <ChartErrorBoundary title={chart.title}>
-      <div className="glass-card rounded-2xl p-5 border border-dark-border flex flex-col justify-between shadow-xl space-y-4">
+      <div className="glass-card rounded-2xl p-5 border border-dark-border flex flex-col justify-between shadow-xl space-y-4 min-h-[360px]">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -53,15 +53,15 @@ export const LineChartCard = ({ chart }) => {
             </p>
           </div>
 
-          <div className="px-2.5 py-1 rounded-full bg-dark-bg border border-dark-border text-[10px] font-semibold text-slate-400 flex items-center space-x-1">
+          <div className="px-2.5 py-1 rounded-full bg-dark-bg border border-dark-border text-[10px] font-semibold text-slate-400 flex items-center space-x-1 flex-shrink-0">
             <Info className="w-3 h-3 text-brand-400" />
             <span>Time Series</span>
           </div>
         </div>
 
         {/* Chart Canvas */}
-        <div className="h-64 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full h-[260px] min-h-[260px] pt-2">
+          <ResponsiveContainer width="100%" height={260} minHeight={260}>
             <AreaChart data={chart.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

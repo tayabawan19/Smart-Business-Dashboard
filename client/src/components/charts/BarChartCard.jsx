@@ -46,7 +46,7 @@ export const BarChartCard = ({ chart }) => {
 
   return (
     <ChartErrorBoundary title={chart.title}>
-      <div className="glass-card rounded-2xl p-5 border border-dark-border flex flex-col justify-between shadow-xl space-y-4">
+      <div className="glass-card rounded-2xl p-5 border border-dark-border flex flex-col justify-between shadow-xl space-y-4 min-h-[360px]">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -62,15 +62,15 @@ export const BarChartCard = ({ chart }) => {
             </p>
           </div>
 
-          <div className="px-2.5 py-1 rounded-full bg-dark-bg border border-dark-border text-[10px] font-semibold text-slate-400 flex items-center space-x-1">
+          <div className="px-2.5 py-1 rounded-full bg-dark-bg border border-dark-border text-[10px] font-semibold text-slate-400 flex items-center space-x-1 flex-shrink-0">
             <Info className="w-3 h-3 text-emerald-400" />
             <span>Bar Chart</span>
           </div>
         </div>
 
         {/* Chart Canvas */}
-        <div className="h-64 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full h-[260px] min-h-[260px] pt-2">
+          <ResponsiveContainer width="100%" height={260} minHeight={260}>
             <BarChart data={chart.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
               <XAxis

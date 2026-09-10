@@ -86,7 +86,6 @@ export const generateLineCharts = (dateColumns, numberColumns, rows) => {
 
   for (const dateCol of dateColumns) {
     for (const numCol of numberColumns.slice(0, 2)) {
-      // Find date range
       const validEntries = [];
       for (const row of rows) {
         const d = parseDateObj(row[dateCol.name]);
@@ -132,7 +131,7 @@ export const generateLineCharts = (dateColumns, numberColumns, rows) => {
           id: `line_${dateCol.name}_${numCol.name}`,
           type: 'line',
           title: `${numCol.name} over Time`,
-          subtitle: `Aggregated by ${bucketType} based on ${dateCol.name}`,
+          subtitle: `Chronological trend by ${dateCol.name}`,
           xAxisLabel: dateCol.name,
           yAxisLabel: numCol.name,
           data: chartData,
@@ -150,7 +149,26 @@ export const generateLineCharts = (dateColumns, numberColumns, rows) => {
 export const generateBarCharts = (textColumns, numberColumns, rows) => {
   const charts = [];
 
-  for (const textCol of textColumns.slice(0, 2)) {
+  // Filter out text columns that are long sentences or freeform notes (e.g. avg text length > 25)
+  const categoryColumns = textColumns.filter((col) => {
+    let totalLen = 0;
+    let count = 0;
+    const uniqueSet = new Set();
+    for (const row of rows) {
+      const v = row[col.name];
+      if (v) {
+        const s = String(v).trim();
+        totalLen += s.length;
+        count++;
+        uniqueSet.add(s);
+      }
+    }
+    const avgLen = count > 0 ? totalLen / count : 0;
+    // Suitable category: avg length <= 30 and cardinality reasonable
+    return avgLen <= 30 && uniqueSet.size >= 2;
+  });
+
+  for (const textCol of categoryColumns.slice(0, 2)) {
     for (const numCol of numberColumns.slice(0, 2)) {
       const categoryMap = new Map();
 
@@ -175,7 +193,6 @@ export const generateBarCharts = (textColumns, numberColumns, rows) => {
 
       if (categoryMap.size < 2) continue;
 
-      // Sort descending by aggregated metric
       const sorted = Array.from(categoryMap.values()).sort((a, b) => b.value - a.value);
 
       let chartData = [];
@@ -195,7 +212,7 @@ export const generateBarCharts = (textColumns, numberColumns, rows) => {
         id: `bar_${textCol.name}_${numCol.name}`,
         type: 'bar',
         title: `${numCol.name} by ${textCol.name}`,
-        subtitle: `Comparison across ${sorted.length > 10 ? 'top categories' : textCol.name}`,
+        subtitle: `Comparison across top ${textCol.name} categories`,
         xAxisLabel: textCol.name,
         yAxisLabel: numCol.name,
         data: chartData,
@@ -220,8 +237,11 @@ export const generatePieCharts = (textColumns, numberColumns, rows) => {
       let cat = row[textCol.name];
       if (cat !== null && cat !== undefined && String(cat).trim() !== '') {
         cat = String(cat).replace(/^'/, '').trim();
-        valueMap.set(cat, (valueMap.get(cat) || 0) + 1);
-        totalEntries++;
+        // Skip long descriptive sentences
+        if (cat.length <= 30) {
+          valueMap.set(cat, (valueMap.get(cat) || 0) + 1);
+          totalEntries++;
+        }
       }
     }
 
@@ -248,7 +268,6 @@ export const generatePieCharts = (textColumns, numberColumns, rows) => {
 
 /**
  * Main Auto-Charting Coordinator
- * Computes KPIs and candidate charts, returns clean structured payload.
  */
 export const generateAutoCharts = (dataset) => {
   const { columns = [], data = [], fileName = 'Dataset' } = dataset;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useDatasetCharts } from '../hooks/useDatasetCharts';
@@ -27,40 +27,58 @@ import {
 export const Dashboard = () => {
   const { currentUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const routeParams = useParams(); // In case accessed via /datasets/:id/dashboard
   const [datasets, setDatasets] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const [loadingDatasets, setLoadingDatasets] = useState(true);
 
   const userEmail = currentUser?.email || 'user@example.com';
 
-  // Fetch available datasets
+  // Load datasets list
   useEffect(() => {
+    let isMounted = true;
     const loadDatasets = async () => {
       try {
+        console.log('[Dashboard] Fetching user datasets...');
         setLoadingDatasets(true);
         const res = await api.getDatasets();
         const list = res.datasets || [];
+        console.log(`[Dashboard] User datasets found: ${list.length}`);
+        
+        if (!isMounted) return;
         setDatasets(list);
 
-        const paramId = searchParams.get('datasetId');
-        if (paramId && list.some((d) => d._id === paramId)) {
-          setSelectedDatasetId(paramId);
+        // Priority 1: route param :id
+        // Priority 2: query param ?datasetId=...
+        // Priority 3: first dataset in list
+        const requestedId = routeParams.id || searchParams.get('datasetId');
+        if (requestedId && list.some((d) => d._id === requestedId)) {
+          console.log(`[Dashboard] Setting selectedDatasetId to requestedId: ${requestedId}`);
+          setSelectedDatasetId(requestedId);
         } else if (list.length > 0) {
+          console.log(`[Dashboard] Setting selectedDatasetId to first dataset: ${list[0]._id} (${list[0].fileName})`);
           setSelectedDatasetId(list[0]._id);
+        } else {
+          console.log('[Dashboard] No datasets found for user.');
+          setSelectedDatasetId('');
         }
       } catch (err) {
-        console.error('Failed to load datasets for dashboard', err);
+        console.error('[Dashboard] Error loading datasets:', err);
       } finally {
-        setLoadingDatasets(false);
+        if (isMounted) setLoadingDatasets(false);
       }
     };
 
     loadDatasets();
-  }, [searchParams]);
+    return () => {
+      isMounted = false;
+    };
+  }, [routeParams.id, searchParams]);
 
   // Handle dropdown selection
   const handleDatasetChange = (e) => {
     const newId = e.target.value;
+    console.log(`[Dashboard] Dataset dropdown changed to: ${newId}`);
     setSelectedDatasetId(newId);
     setSearchParams({ datasetId: newId });
   };
@@ -166,7 +184,7 @@ export const Dashboard = () => {
       {loadingDatasets ? (
         <div className="glass-card rounded-2xl p-12 text-center border border-dark-border">
           <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-400">Loading datasets...</p>
+          <p className="text-xs text-slate-400">Loading your datasets...</p>
         </div>
       ) : datasets.length === 0 ? (
         /* Empty State: No Datasets Uploaded */
@@ -201,7 +219,7 @@ export const Dashboard = () => {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white">
-                  {selectedDataset?.fileName}
+                  {selectedDataset?.fileName || 'Selected Dataset'}
                 </h2>
                 <p className="text-[11px] text-slate-400">
                   {selectedDataset?.rowCount.toLocaleString()} rows • {selectedDataset?.columnCount} columns
@@ -227,7 +245,7 @@ export const Dashboard = () => {
           </div>
 
           {/* Loading Skeleton */}
-          {loadingCharts ? (
+          {loadingCharts || !chartData ? (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[1, 2, 3, 4].map((i) => (
@@ -253,7 +271,7 @@ export const Dashboard = () => {
                 Try Again
               </button>
             </div>
-          ) : chartData && !chartData.canChart ? (
+          ) : !chartData.canChart ? (
             /* Fallback: Not enough numeric / categorical data to chart */
             <div className="glass-card rounded-2xl p-8 border border-amber-500/30 text-center space-y-3">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
@@ -274,7 +292,7 @@ export const Dashboard = () => {
           ) : (
             <>
               {/* 1. KPI Summary Cards Row */}
-              {chartData?.kpis && chartData.kpis.length > 0 && (
+              {chartData.kpis && chartData.kpis.length > 0 && (
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
                     <TrendingUp className="w-4 h-4 text-brand-400" />
@@ -289,11 +307,11 @@ export const Dashboard = () => {
               )}
 
               {/* 2. Auto-Generated Charts Grid */}
-              {chartData?.charts && chartData.charts.length > 0 && (
+              {chartData.charts && chartData.charts.length > 0 ? (
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
                     <LineChart className="w-4 h-4 text-brand-400" />
-                    <span>Auto-Generated Visualizations</span>
+                    <span>Auto-Generated Visualizations ({chartData.charts.length})</span>
                   </h3>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {chartData.charts.map((chart) => {
@@ -309,6 +327,12 @@ export const Dashboard = () => {
                       return null;
                     })}
                   </div>
+                </div>
+              ) : (
+                <div className="glass-card rounded-2xl p-6 border border-dark-border text-center">
+                  <p className="text-xs text-slate-400">
+                    No visual charts could be generated for this specific schema, but KPI summaries above are available.
+                  </p>
                 </div>
               )}
             </>
