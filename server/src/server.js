@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
 import healthRoutes from './routes/health.routes.js';
+import datasetRoutes from './routes/dataset.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -14,17 +16,42 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Connect to MongoDB
 connectDB();
 
-// Middleware
+// Security Headers with Helmet
 app.use(
-  cors({
-    origin: [CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Request logging in development
+// CORS Configuration — only allow designated frontend origins
+const allowedOrigins = [
+  CLIENT_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS Policy: Request origin not allowed.'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+// Body Parser Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Development Request Logger
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
@@ -34,13 +61,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Routes
 app.use('/api/health', healthRoutes);
+app.use('/api', datasetRoutes);
 
 // Root route
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to Smart Business Dashboard API',
     healthCheck: '/api/health',
-    version: '1.0.0',
+    version: '2.0.0',
+    phase: 'Phase 2: File Upload & Dataset Management',
   });
 });
 
@@ -52,17 +81,19 @@ app.use((req, res) => {
   });
 });
 
-// Global Error Handler
+// Global Error Handler — never leak raw stack traces to client in production
 app.use((err, req, res, next) => {
   console.error('[Unhandled Server Error]', err);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong.' : err.message,
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.name || 'Internal Server Error',
+    message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred.' : err.message,
   });
 });
 
 // Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Smart Business Dashboard Server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check available at http://localhost:${PORT}/api/health`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📁 Upload endpoint: http://localhost:${PORT}/api/upload`);
 });

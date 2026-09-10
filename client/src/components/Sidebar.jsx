@@ -3,10 +3,10 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   UploadCloud,
+  Database,
   FileBarChart,
   Settings,
   Sparkles,
-  Database,
   TrendingUp,
   X,
 } from 'lucide-react';
@@ -22,10 +22,17 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
     },
     {
       name: 'Upload Data',
-      to: '#upload',
+      to: '/upload',
       icon: UploadCloud,
-      active: false,
-      badge: 'Phase 2',
+      active: true,
+      badge: null,
+    },
+    {
+      name: 'My Datasets',
+      to: '/datasets',
+      icon: Database,
+      active: true,
+      badge: null,
     },
     {
       name: 'Reports',
@@ -112,7 +119,7 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
               );
             }
 
-            // Non-functional links for Phase 1
+            // Non-functional links for future phases
             return (
               <div
                 key={item.name}
@@ -133,21 +140,21 @@ export const Sidebar = ({ isOpen, closeSidebar }) => {
           })}
         </div>
 
-        {/* AI Assistant Banner / Phase 1 Status */}
+        {/* Phase Status Banner */}
         <div className="p-4 m-4 rounded-2xl bg-gradient-to-b from-brand-950/60 to-dark-card border border-brand-500/20">
           <div className="flex items-center space-x-2 text-brand-400 mb-1.5">
-            <Sparkles className="w-4 h-4 animate-spin-slow" />
-            <span className="text-xs font-semibold">Phase 1: Active</span>
+            <Sparkles className="w-4 h-4" />
+            <span className="text-xs font-semibold">Phase 2: Active</span>
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            Foundation & Auth configured. Ready for dataset upload & ML forecasting in next phase.
+            CSV & Excel parsing, validation, and dataset management are live.
           </p>
         </div>
 
         {/* Footer info */}
         <div className="p-4 border-t border-dark-border text-center">
           <p className="text-[10px] text-slate-500">
-            Smart Business Dashboard v1.0.0
+            Smart Business Dashboard v2.0.0
           </p>
         </div>
       </aside>
