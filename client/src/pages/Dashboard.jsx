@@ -3,10 +3,12 @@ import { Link, useSearchParams, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useDatasetCharts } from '../hooks/useDatasetCharts';
+import { useDatasetAnalysis } from '../hooks/useDatasetAnalysis';
 import { KpiCard } from '../components/charts/KpiCard';
 import { LineChartCard } from '../components/charts/LineChartCard';
 import { BarChartCard } from '../components/charts/BarChartCard';
 import { PieChartCard } from '../components/charts/PieChartCard';
+import { AnalysisSummarySection } from '../components/analysis/AnalysisSummarySection';
 import {
   Sparkles,
   UploadCloud,
@@ -87,6 +89,21 @@ export const Dashboard = () => {
   const { chartData, loading: loadingCharts, error: chartError, isCached, refetch } =
     useDatasetCharts(selectedDatasetId);
 
+  // Custom hook to fetch deep statistical analysis from Python microservice (Phase 4)
+  const {
+    analysisData,
+    loading: loadingAnalysis,
+    error: analysisError,
+    isCached: isAnalysisCached,
+    durationMs: analysisDuration,
+    refetch: refetchAnalysis,
+  } = useDatasetAnalysis(selectedDatasetId);
+
+  const handleRefreshAll = () => {
+    refetch();
+    refetchAnalysis();
+  };
+
   const selectedDataset = datasets.find((d) => d._id === selectedDatasetId);
 
   const phaseCards = [
@@ -101,9 +118,9 @@ export const Dashboard = () => {
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
     },
     {
-      phase: 'Phase 3: Active',
-      title: 'Auto-Charting Intelligence',
-      desc: 'Statistical aggregation, dynamic KPI summaries, trend lines, category comparisons, and distribution charts.',
+      phase: 'Phase 3 & 4',
+      title: 'Auto-Charting & Python Stats Engine',
+      desc: 'Auto-charts, KPIs, trend analysis, top/bottom performers, IQR outliers, and Pearson correlations.',
       status: 'Active',
       icon: LineChart,
       color: 'from-brand-500/20 to-brand-500/5',
@@ -111,7 +128,7 @@ export const Dashboard = () => {
       badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
     },
     {
-      phase: 'Phase 4 & 5',
+      phase: 'Phase 5: Next Up',
       title: 'AI Intelligence & Forecasting',
       desc: 'LLM-driven anomaly explanations, conversational queries, and automated forecast projections.',
       status: 'Planned',
@@ -167,12 +184,12 @@ export const Dashboard = () => {
 
               <div className="self-end sm:self-auto pt-4 sm:pt-4">
                 <button
-                  onClick={refetch}
-                  disabled={loadingCharts}
+                  onClick={handleRefreshAll}
+                  disabled={loadingCharts || loadingAnalysis}
                   className="p-2.5 rounded-xl bg-dark-bg border border-dark-border text-slate-300 hover:text-white hover:bg-dark-hover transition-colors"
-                  title="Re-compute Charts"
+                  title="Re-run Visuals & Statistical Analysis"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loadingCharts ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 ${(loadingCharts || loadingAnalysis) ? 'animate-spin' : ''}`} />
                 </button>
               </div>
             </div>
@@ -337,6 +354,16 @@ export const Dashboard = () => {
               )}
             </>
           )}
+
+          {/* 3. Statistical Analysis & Key Insights Section (Phase 4 Python Microservice) */}
+          <AnalysisSummarySection
+            analysisData={analysisData}
+            loading={loadingAnalysis}
+            error={analysisError}
+            isCached={isAnalysisCached}
+            durationMs={analysisDuration}
+            onRefetch={refetchAnalysis}
+          />
         </div>
       )}
 

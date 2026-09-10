@@ -1,40 +1,48 @@
 # 🚀 Smart Business Dashboard
 
-An AI-powered business data analysis platform designed to help teams analyze metrics, upload datasets, generate reports, and forecast business performance.
+An AI-powered business data analysis platform designed to help teams ingest spreadsheets, auto-generate interactive visualizations, perform deep statistical analysis, and forecast business performance.
 
 ---
 
-## 📁 Project Structure (Monorepo)
+## 📁 Architecture & Monorepo Structure
 
 ```text
 smart-business-dashboard/
-├── client/                     # React (Vite) Frontend
+├── client/                     # React (Vite) Frontend (Port 5173)
 │   ├── public/                 # Static assets
 │   ├── src/
-│   │   ├── components/         # Layout, Navbar, Sidebar, ProtectedRoute
+│   │   ├── components/         # Layout, Navbar, Sidebar, Charts, Analysis Section
 │   │   ├── context/            # AuthContext (Firebase Auth)
 │   │   ├── firebase/           # Firebase configuration
-│   │   ├── pages/              # Login, Signup, Dashboard pages
-│   │   ├── App.jsx             # Router & page routes
-│   │   ├── index.css           # Tailwind CSS directives & global styling
-│   │   └── main.jsx            # Application entry point
+│   │   ├── hooks/              # useDatasetCharts, useDatasetAnalysis
+│   │   ├── pages/              # Login, Signup, Dashboard, Upload, Datasets pages
+│   │   ├── services/           # API client methods
+│   │   ├── App.jsx             # Router & protected routes
+│   │   └── index.css           # Tailwind CSS directives & theme
 │   ├── .env.example            # Sample client environment variables
-│   ├── package.json            # Client dependencies and scripts
-│   ├── tailwind.config.js      # Tailwind CSS configuration
-│   └── vite.config.js          # Vite configuration
+│   └── package.json            # Client dependencies and scripts
 │
-├── server/                     # Node.js + Express Backend
+├── server/                     # Node.js + Express Backend (Port 5000)
 │   ├── src/
-│   │   ├── config/             # DB & configuration (Mongoose connection)
-│   │   ├── controllers/        # Request handlers (Health, Auth, etc.)
-│   │   ├── models/             # Mongoose schemas & data models
-│   │   ├── routes/             # Express API routes
+│   │   ├── config/             # MongoDB Mongoose connection
+│   │   ├── controllers/        # Dataset, Chart, and Analysis controllers
+│   │   ├── middleware/         # Auth, Upload (Multer memory), Rate limiting
+│   │   ├── models/             # Dataset model with chartCache & analysisCache
+│   │   ├── routes/             # Health, Upload, Dataset, Chart, Analysis endpoints
+│   │   ├── utils/              # File parser (PapaParse/XLSX) & chartEngine
 │   │   └── server.js           # Express app entry point
 │   ├── .env.example            # Sample server environment variables
 │   └── package.json            # Server dependencies and scripts
 │
+├── analysis-service/           # Python Statistical Microservice (FastAPI, Port 8000)
+│   ├── main.py                 # FastAPI application & security middleware
+│   ├── analyzer.py             # Pandas engine (Trends, Outliers, Rankings, Correlations)
+│   ├── requirements.txt        # FastAPI, Uvicorn, Pandas, Pydantic, Dotenv
+│   ├── .env.example            # Port & INTERNAL_API_KEY config
+│   └── .venv/                  # Python virtual environment
+│
 ├── .gitignore                  # Git ignore rules
-├── package.json                # Root package for workspace scripts
+├── package.json                # Root orchestration scripts
 └── README.md                   # Project documentation
 ```
 
@@ -42,117 +50,115 @@ smart-business-dashboard/
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 18, Vite, Tailwind CSS, React Router v6, Lucide React (Icons), Firebase Authentication.
-- **Backend**: Node.js, Express.js, Mongoose (MongoDB), CORS, Dotenv.
-- **Authentication**: Firebase Authentication (Email/Password & Google Sign-in).
+- **Frontend**: React 18, Vite, Tailwind CSS, Recharts, React Router v6, Lucide React, Firebase Authentication.
+- **Backend**: Node.js (ESM), Express.js, Mongoose (MongoDB), Multer (in-memory storage), PapaParse, XLSX (SheetJS), Helmet, express-rate-limit.
+- **Analysis Microservice**: Python 3.14+, FastAPI, Uvicorn, Pandas, NumPy, Pydantic v2.
+- **Database**: MongoDB (`smart_business_dashboard`).
+- **Security**: Firebase JWT Auth, Formula Injection defense, Magic Byte MIME validation, Internal API Key authentication (`X-Internal-Key`).
 
 ---
 
-## ⚡ Quick Start & Installation
+## ⚡ Quick Start & Setup
 
-### 1. Install Dependencies
-
-You can install all dependencies across both client and server from the root directory:
-
-```bash
-npm run install:all
-```
-
-Or install them individually:
-
-```bash
-# Server dependencies
-cd server
-npm install
-
-# Client dependencies
-cd ../client
-npm install
-```
-
----
-
-### 2. Configure Environment Variables
+### 1. Configure Environment Variables
 
 #### Backend (`/server/.env`):
-Copy the example file and update values if needed:
-```bash
-cp server/.env.example server/.env
-```
-Default server environment variables:
 ```env
 PORT=5000
 NODE_ENV=development
 MONGO_URI=mongodb://localhost:27017/smart_business_dashboard
 CLIENT_URL=http://localhost:5173
+ANALYSIS_SERVICE_URL=http://localhost:8000
+INTERNAL_API_KEY=sbd_internal_secure_key_2026
+```
+
+#### Python Microservice (`/analysis-service/.env`):
+```env
+PORT=8000
+INTERNAL_API_KEY=sbd_internal_secure_key_2026
+ENVIRONMENT=development
 ```
 
 #### Frontend (`/client/.env`):
-Copy the example file and add your Firebase project credentials:
-```bash
-cp client/.env.example client/.env
-```
-Default client environment variables:
 ```env
-VITE_FIREBASE_API_KEY=your_firebase_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
 VITE_API_BASE_URL=http://localhost:5000/api
+VITE_FIREBASE_API_KEY=AIzaSyBPiAEWgBc09h5NlOCW3OEAA1emf5xNNcE
+VITE_FIREBASE_AUTH_DOMAIN=smart-business-4cc00.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=smart-business-4cc00
+VITE_FIREBASE_STORAGE_BUCKET=smart-business-4cc00.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=590450859096
+VITE_FIREBASE_APP_ID=1:590450859096:web:89fb5a719158d0d6d2be2d
 ```
-
-> **Note**: If Firebase credentials are not yet configured, the app provides an interactive Demo Mode toggle on the login page so you can explore the UI immediately.
 
 ---
 
-### 3. Running the Application
-
-You can run both client and server simultaneously from the root directory:
+### 2. Setup Python Virtual Environment
 
 ```bash
-npm run dev
+cd analysis-service
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt   # On Windows
+# source .venv/bin/activate && pip install -r requirements.txt   # On macOS/Linux
 ```
 
-Or run them independently in separate terminals:
+---
 
-#### Run Server:
+### 3. Running All Services
+
+#### Option A: Run All Concurrently (Recommended)
+From the root repository directory:
 ```bash
+npm run dev:all
+```
+This boots Express (5000), Vite (5173), and the Python Microservice (8000) simultaneously.
+
+#### Option B: Run Individually in Separate Terminals
+```bash
+# 1. Express Backend
 cd server
 npm run dev
-```
-- API Base URL: `http://localhost:5000`
-- Health Check: `http://localhost:5000/api/health`
 
-#### Run Client:
-```bash
+# 2. Python Analysis Service
+cd analysis-service
+.venv\Scripts\python -m uvicorn main:app --port 8000 --reload
+
+# 3. React Frontend
 cd client
 npm run dev
 ```
-- Client App: `http://localhost:5173`
+
+- **Frontend App**: `http://localhost:5173`
+- **Backend API**: `http://localhost:5000` (Health check: `/api/health`)
+- **Python Service**: `http://localhost:8000` (Health check: `/health`, Docs: `/docs`)
 
 ---
 
-## 🎯 Phase 1 Features Included
+## 🎯 Completed Phases
 
-- **Express Server**: Configured with CORS, JSON body parser, and graceful MongoDB Mongoose connection.
-- **Health Check Route**: `GET /api/health` returning `{ status: "ok", timestamp: ... }`.
-- **Firebase Authentication**:
-  - Sign Up (Email & Password)
-  - Sign In (Email & Password + Google Sign-In button)
-  - Sign Out
-- **Protected Routing**: Guards `/dashboard` and redirects unauthenticated users to `/login`.
-- **Layout System**:
-  - Top **Navbar** with user profile badge and instant logout.
-  - Collapsible/styled **Sidebar** with Dashboard, Upload Data, Reports, and Settings links.
-- **Dashboard**: Welcomes the authenticated user (`Welcome, [user email]`) with a modern analytics starter overview.
+### ✅ Phase 1: Foundation & Authentication
+- Express server, MongoDB Mongoose connection, Firebase Authentication (email/password & Google login).
+- Protected routing and modern dark-mode layout with responsive navigation.
+
+### ✅ Phase 2: File Upload & Ingestion
+- In-memory Multer processing with zero disk footprint.
+- CSV (PapaParse) and Excel (SheetJS) parsing with formula injection defense (`=`, `+`, `-`, `@` neutralization).
+- Magic-byte MIME validation, schema/type detection (number/date/text), and dataset preview table.
+
+### ✅ Phase 3: Auto-Charting Engine
+- Server-side pre-aggregation engine producing KPIs, Time Series Line charts, Category Bar charts, and Distribution Pie charts.
+- MongoDB `chartCache` for sub-millisecond instant renders.
+- Recharts responsive cards with dark-mode tooltips, gradients, and empty/error fallbacks.
+
+### ✅ Phase 4: Python Statistical Analysis Microservice
+- Isolated FastAPI microservice protected with `X-Internal-Key` internal authentication.
+- **Period-Over-Period Trend Trajectories**: Direction (`increasing`, `decreasing`, `stable`), overall % change, latest period % change, volatility.
+- **Performance Rankings**: Top 5 and Bottom 5 category performers with contribution share bars.
+- **Outlier Detection**: Interquartile Range (IQR = Q3 - Q1) rule flagging boundary violations and distances.
+- **Comprehensive Summary Statistics**: Mean, median, std dev, min, max, count, and IQR for all numeric metrics.
+- **Pearson Correlations**: Cross-metric correlation coefficients with human-readable strength classifications.
+- Express backend caching (`analysisCache`) with 15-second timeout and graceful 503 fallback.
 
 ---
 
-## 🔮 Upcoming Phases
-
-- **Phase 2**: CSV/Excel Dataset Upload, Data Parsing & Validation, MongoDB Dataset Storage.
-- **Phase 3**: Interactive Data Visualizations & Dynamic Business Metrics.
-- **Phase 4**: AI-Powered Business Insights & Automated Anomaly Detection.
-- **Phase 5**: Predictive Forecasting & PDF/CSV Business Report Generation.
+## 🔮 Next: Phase 5
+- **AI Intelligence & Forecasting Engine**: Feed Phase 4 structured analytical JSON into LLMs for plain-English business explanations, executive summaries, and predictive forecasting.

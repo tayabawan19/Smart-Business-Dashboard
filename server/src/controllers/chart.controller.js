@@ -38,8 +38,9 @@ export const getDatasetCharts = async (req, res, next) => {
     console.log(`[Backend Chart Controller] Dataset found in MongoDB: "${dataset.fileName}" (${dataset.rowCount} rows, ${dataset.columnCount} columns)`);
 
     // 3. Ownership check
-    if (dataset.userId !== userId) {
-      console.warn(`[Backend Chart Controller] Ownership mismatch: dataset.userId (${dataset.userId}) !== req.user.uid (${userId})`);
+    const userIdentifiers = [req.user?.uid, req.user?.email].filter(Boolean);
+    if (!userIdentifiers.includes(dataset.userId)) {
+      console.warn(`[Backend Chart Controller] Ownership mismatch: dataset.userId (${dataset.userId}) not in [${userIdentifiers.join(', ')}]`);
       return res.status(403).json({
         error: 'Forbidden',
         message: 'You do not have permission to view charts for this dataset.',

@@ -92,6 +92,11 @@ export const api = {
     return request(`/datasets/${id}/charts`, { method: 'GET' });
   },
 
+  // Get deep statistical analysis from Python microservice (Phase 4)
+  getDatasetAnalysis: async (id) => {
+    return request(`/datasets/${id}/analysis`, { method: 'GET' });
+  },
+
   // Delete a dataset
   deleteDataset: async (id) => {
     return request(`/datasets/${id}`, { method: 'DELETE' });

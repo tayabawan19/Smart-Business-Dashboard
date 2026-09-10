@@ -67,10 +67,10 @@ export const uploadDataset = async (req, res, next) => {
  */
 export const getUserDatasets = async (req, res, next) => {
   try {
-    const userId = req.user.uid;
+    const userIdentifiers = [req.user.uid, req.user.email].filter(Boolean);
 
     // Lean query excluding the raw data array for fast listing performance
-    const datasets = await Dataset.find({ userId })
+    const datasets = await Dataset.find({ userId: { $in: userIdentifiers } })
       .select('-data')
       .sort({ createdAt: -1 })
       .lean();
@@ -93,7 +93,7 @@ export const getUserDatasets = async (req, res, next) => {
 export const getDatasetById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.user.uid;
+    const userIdentifiers = [req.user.uid, req.user.email].filter(Boolean);
 
     const dataset = await Dataset.findById(id);
 
@@ -105,7 +105,7 @@ export const getDatasetById = async (req, res, next) => {
     }
 
     // Strict ownership verification
-    if (dataset.userId !== userId) {
+    if (!userIdentifiers.includes(dataset.userId)) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'You do not have permission to access this dataset.',
@@ -150,7 +150,7 @@ export const getDatasetById = async (req, res, next) => {
 export const deleteDataset = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.user.uid;
+    const userIdentifiers = [req.user.uid, req.user.email].filter(Boolean);
 
     const dataset = await Dataset.findById(id);
 
@@ -162,7 +162,7 @@ export const deleteDataset = async (req, res, next) => {
     }
 
     // Strict ownership verification
-    if (dataset.userId !== userId) {
+    if (!userIdentifiers.includes(dataset.userId)) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'You do not have permission to delete this dataset.',

@@ -9,6 +9,7 @@ import {
   deleteDataset,
 } from '../controllers/dataset.controller.js';
 import { getDatasetCharts } from '../controllers/chart.controller.js';
+import { getDatasetAnalysis } from '../controllers/analysis.controller.js';
 
 const router = Router();
 
@@ -39,6 +40,21 @@ const chartLimiter = rateLimit({
   },
   keyGenerator: (req) => {
     return req.user?.uid || req.ip || 'anonymous-charter';
+  },
+});
+
+// Rate limiter for Python analysis requests: max 60 requests per 15 minutes per user
+const analysisLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too Many Requests',
+    message: 'Analysis request limit reached. Please wait a moment before requesting more dataset analysis.',
+  },
+  keyGenerator: (req) => {
+    return req.user?.uid || req.ip || 'anonymous-analyzer';
   },
 });
 
@@ -78,6 +94,13 @@ router.get('/datasets/:id', getDatasetById);
  * @access  Private
  */
 router.get('/datasets/:id/charts', chartLimiter, getDatasetCharts);
+
+/**
+ * @route   GET /api/datasets/:id/analysis
+ * @desc    Get deep statistical analysis (trends, top/bottom, outliers, correlations) from Python microservice
+ * @access  Private
+ */
+router.get('/datasets/:id/analysis', analysisLimiter, getDatasetAnalysis);
 
 /**
  * @route   DELETE /api/datasets/:id

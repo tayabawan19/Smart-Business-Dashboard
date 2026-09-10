@@ -6,10 +6,12 @@
   "scripts": {
     "client": "npm --prefix client run dev",
     "server": "npm --prefix server run dev",
+    "analysis": "cd analysis-service && .venv\\Scripts\\python -m uvicorn main:app --port 8000 --reload",
     "install:server": "npm --prefix server install",
     "install:client": "npm --prefix client install",
     "install:all": "npm --prefix server install && npm --prefix client install",
-    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\""
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:all": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\" \"npm run analysis\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
