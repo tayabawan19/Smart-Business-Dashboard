@@ -8,13 +8,14 @@ import {
   getDatasetById,
   deleteDataset,
 } from '../controllers/dataset.controller.js';
+import { getDatasetCharts } from '../controllers/chart.controller.js';
 
 const router = Router();
 
 // Rate limiter for upload endpoint: max 10 uploads per 15 minutes per user/IP
 const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP / user to 10 upload requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -23,6 +24,21 @@ const uploadLimiter = rateLimit({
   },
   keyGenerator: (req) => {
     return req.user?.uid || req.ip || 'anonymous-uploader';
+  },
+});
+
+// Rate limiter for chart calculations: max 60 chart requests per 15 minutes per user
+const chartLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too Many Requests',
+    message: 'Chart request limit reached. Please wait a moment before requesting more charts.',
+  },
+  keyGenerator: (req) => {
+    return req.user?.uid || req.ip || 'anonymous-charter';
   },
 });
 
@@ -55,6 +71,13 @@ router.get('/datasets', getUserDatasets);
  * @access  Private
  */
 router.get('/datasets/:id', getDatasetById);
+
+/**
+ * @route   GET /api/datasets/:id/charts
+ * @desc    Generate or fetch cached auto-charts and KPIs for a dataset
+ * @access  Private
+ */
+router.get('/datasets/:id/charts', chartLimiter, getDatasetCharts);
 
 /**
  * @route   DELETE /api/datasets/:id

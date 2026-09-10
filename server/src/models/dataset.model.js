@@ -68,6 +68,10 @@ const datasetSchema = new mongoose.Schema(
       required: true,
       default: [],
     },
+    chartCache: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     status: {
       type: String,
       enum: ['processing', 'ready', 'failed'],

@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
+import { useDatasetCharts } from '../hooks/useDatasetCharts';
+import { KpiCard } from '../components/charts/KpiCard';
+import { LineChartCard } from '../components/charts/LineChartCard';
+import { BarChartCard } from '../components/charts/BarChartCard';
+import { PieChartCard } from '../components/charts/PieChartCard';
 import {
   Sparkles,
   UploadCloud,
@@ -11,42 +16,66 @@ import {
   ShieldCheck,
   Database,
   Layers,
-  ArrowUpRight,
+  ChevronDown,
+  RefreshCw,
+  AlertCircle,
   FileSpreadsheet,
-  ArrowRight,
+  CheckCircle2,
+  Zap,
 } from 'lucide-react';
 
 export const Dashboard = () => {
   const { currentUser } = useAuth();
-  const [datasetCount, setDatasetCount] = useState(0);
-  const [recentDatasets, setRecentDatasets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [datasets, setDatasets] = useState([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState('');
+  const [loadingDatasets, setLoadingDatasets] = useState(true);
 
   const userEmail = currentUser?.email || 'user@example.com';
 
+  // Fetch available datasets
   useEffect(() => {
-    const fetchRecentDatasets = async () => {
+    const loadDatasets = async () => {
       try {
-        setLoading(true);
+        setLoadingDatasets(true);
         const res = await api.getDatasets();
-        const datasets = res.datasets || [];
-        setDatasetCount(datasets.length);
-        setRecentDatasets(datasets.slice(0, 3));
+        const list = res.datasets || [];
+        setDatasets(list);
+
+        const paramId = searchParams.get('datasetId');
+        if (paramId && list.some((d) => d._id === paramId)) {
+          setSelectedDatasetId(paramId);
+        } else if (list.length > 0) {
+          setSelectedDatasetId(list[0]._id);
+        }
       } catch (err) {
-        console.warn('Could not fetch datasets for dashboard overview', err);
+        console.error('Failed to load datasets for dashboard', err);
       } finally {
-        setLoading(false);
+        setLoadingDatasets(false);
       }
     };
 
-    fetchRecentDatasets();
-  }, []);
+    loadDatasets();
+  }, [searchParams]);
+
+  // Handle dropdown selection
+  const handleDatasetChange = (e) => {
+    const newId = e.target.value;
+    setSelectedDatasetId(newId);
+    setSearchParams({ datasetId: newId });
+  };
+
+  // Custom hook to fetch charts for the selected dataset
+  const { chartData, loading: loadingCharts, error: chartError, isCached, refetch } =
+    useDatasetCharts(selectedDatasetId);
+
+  const selectedDataset = datasets.find((d) => d._id === selectedDatasetId);
 
   const phaseCards = [
     {
-      phase: 'Phase 1: Complete',
-      title: 'Foundation & Setup',
-      desc: 'React (Vite), Tailwind CSS, Firebase Authentication, protected routes & Express server setup.',
+      phase: 'Phase 1 & 2',
+      title: 'Foundation & File Ingestion',
+      desc: 'Auth, MongoDB, in-memory parsing for CSV & Excel with formula injection defense.',
       status: 'Active',
       icon: ShieldCheck,
       color: 'from-emerald-500/20 to-emerald-500/5',
@@ -54,29 +83,19 @@ export const Dashboard = () => {
       badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
     },
     {
-      phase: 'Phase 2: Complete',
-      title: 'Dataset Upload & Parsing',
-      desc: 'In-memory parsing (.csv, .xlsx, .xls), formula injection defense, automatic type detection, and MongoDB storage.',
+      phase: 'Phase 3: Active',
+      title: 'Auto-Charting Intelligence',
+      desc: 'Statistical aggregation, dynamic KPI summaries, trend lines, category comparisons, and distribution charts.',
       status: 'Active',
-      icon: UploadCloud,
+      icon: LineChart,
       color: 'from-brand-500/20 to-brand-500/5',
       borderColor: 'border-brand-500/30',
       badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
     },
     {
-      phase: 'Phase 3: Next',
-      title: 'Interactive Analytics & Charts',
-      desc: 'Revenue, KPI metrics, dynamic sales charts, breakdown tables, and custom date range filters.',
-      status: 'Upcoming',
-      icon: LineChart,
-      color: 'from-indigo-500/20 to-indigo-500/5',
-      borderColor: 'border-indigo-500/30',
-      badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    },
-    {
       phase: 'Phase 4 & 5',
       title: 'AI Intelligence & Forecasting',
-      desc: 'LLM-driven anomaly detection, natural language data queries, and predictive trend forecasting.',
+      desc: 'LLM-driven anomaly explanations, conversational queries, and automated forecast projections.',
       status: 'Planned',
       icon: BrainCircuit,
       color: 'from-purple-500/20 to-purple-500/5',
@@ -86,92 +105,228 @@ export const Dashboard = () => {
   ];
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Welcome Banner */}
+    <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto">
+      {/* Top Header & Dataset Selector Bar */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-950 via-dark-card to-dark-card border border-brand-500/20 p-6 sm:p-8 shadow-2xl">
-        {/* Background glow */}
         <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-brand-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Smart Business Intelligence Engine</span>
+              <Zap className="w-3.5 h-3.5 text-brand-400" />
+              <span>Phase 3: Auto-Charting Engine</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-indigo-300">{userEmail}</span>
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-              Phase 2 File Upload Module is active. Upload your CSV or Excel spreadsheets to parse columns, preview data, and prepare for Phase 3 visual analytics.
+              Auto-generated analytics and visual insights from your uploaded business spreadsheets.
             </p>
           </div>
 
-          <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* Dataset Switcher Dropdown */}
+          {datasets.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative min-w-[240px]">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Active Dataset
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedDatasetId}
+                    onChange={handleDatasetChange}
+                    className="w-full appearance-none bg-dark-bg border border-brand-500/30 text-xs font-semibold text-white rounded-xl px-3.5 py-2.5 pr-8 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all cursor-pointer"
+                  >
+                    {datasets.map((d) => (
+                      <option key={d._id} value={d._id} className="bg-dark-card text-white">
+                        {d.fileName} ({d.rowCount.toLocaleString()} rows)
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="self-end sm:self-auto pt-4 sm:pt-4">
+                <button
+                  onClick={refetch}
+                  disabled={loadingCharts}
+                  className="p-2.5 rounded-xl bg-dark-bg border border-dark-border text-slate-300 hover:text-white hover:bg-dark-hover transition-colors"
+                  title="Re-compute Charts"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingCharts ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main View Area */}
+      {loadingDatasets ? (
+        <div className="glass-card rounded-2xl p-12 text-center border border-dark-border">
+          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-xs text-slate-400">Loading datasets...</p>
+        </div>
+      ) : datasets.length === 0 ? (
+        /* Empty State: No Datasets Uploaded */
+        <div className="glass-card rounded-3xl p-10 sm:p-14 border border-dark-border text-center space-y-4 max-w-xl mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center mx-auto shadow-glow">
+            <UploadCloud className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-white">No Datasets Ready for Visuals</h3>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
+              Upload a business spreadsheet (.csv, .xlsx) to unlock auto-generated KPI metric cards, time series trends, and category distribution charts.
+            </p>
+          </div>
+          <div className="pt-2">
             <Link
               to="/upload"
-              className="inline-flex items-center space-x-2 px-5 py-3 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-2xl shadow-glow transition-all"
+              className="inline-flex items-center space-x-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-xl shadow-glow transition-all"
             >
               <UploadCloud className="w-4 h-4" />
-              <span>Upload Dataset</span>
+              <span>Upload Your First Dataset</span>
             </Link>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Chart Dashboard Content */
+        <div className="space-y-8">
+          {/* Active Dataset Meta Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center">
+                <FileSpreadsheet className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">
+                  {selectedDataset?.fileName}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {selectedDataset?.rowCount.toLocaleString()} rows • {selectedDataset?.columnCount} columns
+                </p>
+              </div>
+            </div>
 
-      {/* Dataset Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-5 rounded-2xl border border-dark-border flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Uploaded Datasets
-            </p>
-            <p className="text-2xl font-extrabold text-white">{datasetCount}</p>
+            <div className="flex items-center space-x-2 self-start sm:self-auto">
+              {isCached && (
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Instant Cache Active</span>
+                </span>
+              )}
+
+              <Link
+                to="/upload"
+                className="text-xs font-semibold text-brand-400 hover:text-brand-300 px-3 py-1 rounded-lg border border-brand-500/20 hover:bg-brand-950/40 transition-colors"
+              >
+                + Upload Another
+              </Link>
+            </div>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center">
-            <Database className="w-5 h-5" />
-          </div>
+
+          {/* Loading Skeleton */}
+          {loadingCharts ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="glass-card rounded-2xl p-5 border border-dark-border h-32 animate-pulse bg-dark-card/50" />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {[1, 2].map((i) => (
+                  <div key={i} className="glass-card rounded-2xl p-6 border border-dark-border h-80 animate-pulse bg-dark-card/50" />
+                ))}
+              </div>
+            </div>
+          ) : chartError ? (
+            /* Error State */
+            <div className="glass-card rounded-2xl p-8 border border-rose-500/30 text-center space-y-3">
+              <AlertCircle className="w-8 h-8 text-rose-400 mx-auto" />
+              <h3 className="text-sm font-bold text-white">Failed to Generate Visuals</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">{chartError}</p>
+              <button
+                onClick={refetch}
+                className="px-4 py-2 bg-dark-bg border border-dark-border text-xs font-semibold text-slate-200 rounded-xl hover:bg-dark-hover transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : chartData && !chartData.canChart ? (
+            /* Fallback: Not enough numeric / categorical data to chart */
+            <div className="glass-card rounded-2xl p-8 border border-amber-500/30 text-center space-y-3">
+              <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
+              <h3 className="text-sm font-bold text-white">Not Enough Data to Auto-Chart</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                {chartData.reason || 'This dataset does not contain sufficient numeric or date values to generate meaningful charts.'}
+              </p>
+              <div className="pt-2">
+                <Link
+                  to="/upload"
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-xl shadow-glow transition-all"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload a Numeric Dataset</span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 1. KPI Summary Cards Row */}
+              {chartData?.kpis && chartData.kpis.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-brand-400" />
+                    <span>Executive KPI Summaries</span>
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {chartData.kpis.map((kpi, idx) => (
+                      <KpiCard key={kpi.id || idx} kpi={kpi} index={idx} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Auto-Generated Charts Grid */}
+              {chartData?.charts && chartData.charts.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-2">
+                    <LineChart className="w-4 h-4 text-brand-400" />
+                    <span>Auto-Generated Visualizations</span>
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {chartData.charts.map((chart) => {
+                      if (chart.type === 'line') {
+                        return <LineChartCard key={chart.id} chart={chart} />;
+                      }
+                      if (chart.type === 'bar') {
+                        return <BarChartCard key={chart.id} chart={chart} />;
+                      }
+                      if (chart.type === 'pie') {
+                        return <PieChartCard key={chart.id} chart={chart} />;
+                      }
+                      return null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
+      )}
 
-        <div className="glass-card p-5 rounded-2xl border border-dark-border flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              File Ingestion Engine
-            </p>
-            <p className="text-sm font-bold text-emerald-400 flex items-center space-x-1">
-              <span>CSV & Excel Ready</span>
-            </p>
-          </div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
-            <FileSpreadsheet className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="glass-card p-5 rounded-2xl border border-dark-border flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-              Security & Sanitization
-            </p>
-            <p className="text-sm font-bold text-brand-400">
-              Formula Defense Active
-            </p>
-          </div>
-          <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* Roadmap & Next Steps */}
-      <div>
+      {/* Roadmap Status Section */}
+      <div className="pt-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-slate-100 flex items-center space-x-2">
             <Layers className="w-4 h-4 text-brand-400" />
             <span>Implementation Roadmap</span>
           </h2>
-          <span className="text-xs text-brand-400 font-semibold">Phase 2 Completed</span>
+          <span className="text-xs text-brand-400 font-semibold">Phase 3 Complete</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {phaseCards.map((card, idx) => {
             const Icon = card.icon;
             return (
@@ -206,74 +361,6 @@ export const Dashboard = () => {
           })}
         </div>
       </div>
-
-      {/* Recent Datasets or Upload CTA */}
-      {datasetCount > 0 ? (
-        <div className="glass-card rounded-2xl p-6 border border-dark-border space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-              <Database className="w-4 h-4 text-brand-400" />
-              <span>Recent Datasets</span>
-            </h3>
-            <Link
-              to="/datasets"
-              className="text-xs font-semibold text-brand-400 hover:text-brand-300 flex items-center space-x-1"
-            >
-              <span>View all ({datasetCount})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="divide-y divide-dark-border/60">
-            {recentDatasets.map((dataset) => (
-              <div
-                key={dataset._id}
-                className="py-3 flex items-center justify-between gap-4 text-xs"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center">
-                    <FileSpreadsheet className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{dataset.fileName}</p>
-                    <p className="text-[11px] text-slate-400">
-                      {dataset.rowCount.toLocaleString()} rows • {dataset.columnCount} columns • {(dataset.fileSize / 1024).toFixed(1)} KB
-                    </p>
-                  </div>
-                </div>
-
-                <Link
-                  to="/datasets"
-                  className="px-3 py-1.5 rounded-lg bg-dark-bg border border-dark-border text-slate-300 hover:text-white hover:bg-dark-hover transition-colors"
-                >
-                  View Details
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="glass-card rounded-2xl p-8 border border-dark-border text-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400 flex items-center justify-center mx-auto shadow-glow">
-            <UploadCloud className="w-7 h-7" />
-          </div>
-          <div className="max-w-md mx-auto space-y-1">
-            <h3 className="text-lg font-bold text-white">Upload Your First Business Dataset</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Import a CSV or Excel file to preview data, review column schemas, and prepare for Phase 3 charts.
-            </p>
-          </div>
-          <div className="pt-2">
-            <Link
-              to="/upload"
-              className="inline-flex items-center space-x-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-xl shadow-glow transition-all"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Go to Upload Page</span>
-            </Link>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

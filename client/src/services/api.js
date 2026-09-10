@@ -55,7 +55,7 @@ const request = async (endpoint, options = {}) => {
  */
 export const api = {
   // Upload a CSV or Excel file
-  uploadDataset: async (file, onUploadProgress) => {
+  uploadDataset: async (file) => {
     const token = await getAuthToken();
     const formData = new FormData();
     formData.append('file', file);
@@ -85,6 +85,11 @@ export const api = {
   // Get specific dataset details and preview rows
   getDatasetById: async (id) => {
     return request(`/datasets/${id}`, { method: 'GET' });
+  },
+
+  // Get auto-generated charts and KPIs for dataset
+  getDatasetCharts: async (id) => {
+    return request(`/datasets/${id}/charts`, { method: 'GET' });
   },
 
   // Delete a dataset

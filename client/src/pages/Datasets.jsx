@@ -229,6 +229,13 @@ export const Datasets = () => {
                     </td>
                     <td className="py-3.5 px-5 text-right">
                       <div className="flex items-center justify-end space-x-2">
+                        <Link
+                          to={`/dashboard?datasetId=${dataset._id}`}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
+                          title="Open Visual Dashboard"
+                        >
+                          <LineChart className="w-4 h-4" />
+                        </Link>
                         <button
                           onClick={() => handleOpenPreview(dataset._id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-dark-hover transition-colors"
