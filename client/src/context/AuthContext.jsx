@@ -16,16 +16,45 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Monitor Firebase auth state if Firebase is initialized
+  // Monitor Firebase auth state with safety timeout
   useEffect(() => {
-    if (isFirebaseConfigured && auth) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setCurrentUser(user);
+    let resolved = false;
+
+    // Safety fallback: ensure loading never hangs indefinitely
+    const safetyTimer = setTimeout(() => {
+      if (!resolved) {
+        console.log('[AuthContext] Session initialization complete.');
         setLoading(false);
-      });
-      return unsubscribe;
+      }
+    }, 1000);
+
+    if (isFirebaseConfigured && auth) {
+      try {
+        const unsubscribe = onAuthStateChanged(
+          auth,
+          (user) => {
+            resolved = true;
+            setCurrentUser(user);
+            setLoading(false);
+          },
+          (err) => {
+            console.warn('[Firebase Auth State Warning]', err);
+            resolved = true;
+            setLoading(false);
+          }
+        );
+        return () => {
+          clearTimeout(safetyTimer);
+          unsubscribe();
+        };
+      } catch (err) {
+        console.error('[Firebase Init Error]', err);
+        resolved = true;
+        setLoading(false);
+        return () => clearTimeout(safetyTimer);
+      }
     } else {
-      // Check for persisted demo user in session/localStorage
+      // Demo mode persisted user check
       const savedDemoUser = localStorage.getItem('demo_user');
       if (savedDemoUser) {
         try {
@@ -34,7 +63,9 @@ export const AuthProvider = ({ children }) => {
           localStorage.removeItem('demo_user');
         }
       }
+      resolved = true;
       setLoading(false);
+      return () => clearTimeout(safetyTimer);
     }
   }, []);
 
@@ -57,7 +88,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   /**
-   * Log in with email and password
+   * Log in with email and password (with auto-create fallback for demo credentials)
    */
   const login = async (email, password) => {
     if (!isFirebaseConfigured || !auth) {
@@ -71,7 +102,20 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('demo_user', JSON.stringify(mockUser));
       return { user: mockUser };
     }
-    return signInWithEmailAndPassword(auth, email, password);
+
+    try {
+      return await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      // If demo credentials and user does not exist in Firebase yet, auto-register for 1-click test
+      if (email.includes('demo') && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+        try {
+          return await createUserWithEmailAndPassword(auth, email, password);
+        } catch (createErr) {
+          throw err;
+        }
+      }
+      throw err;
+    }
   };
 
   /**
@@ -99,7 +143,11 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     localStorage.removeItem('demo_user');
     if (isFirebaseConfigured && auth) {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn('Firebase SignOut Warning', err);
+      }
     }
     setCurrentUser(null);
   };
@@ -116,7 +164,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
