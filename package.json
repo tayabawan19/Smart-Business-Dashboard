@@ -1,0 +1,17 @@
+{
+  "name": "smart-business-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Business Dashboard - AI-powered business data analysis platform",
+  "scripts": {
+    "client": "npm --prefix client run dev",
+    "server": "npm --prefix server run dev",
+    "install:server": "npm --prefix server install",
+    "install:client": "npm --prefix client install",
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
