@@ -7,8 +7,8 @@
  * - Intelligent local business synthesizer fallback
  */
 
-const TIMEOUT_MS = 20000;
-const MAX_TOKENS = 1200;
+const TIMEOUT_MS = 25000;
+const MAX_TOKENS = 2500;
 
 /**
  * System prompt setting analyst persona and strict output constraints
@@ -104,6 +104,9 @@ const parseLlmResponse = (rawText) => {
     const parsed = JSON.parse(rawText.trim());
     if (Array.isArray(parsed)) return parsed;
     if (parsed.insights && Array.isArray(parsed.insights)) return parsed.insights;
+    for (const val of Object.values(parsed)) {
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') return val;
+    }
   } catch (e) {
     // Proceed to regex extraction
   }
@@ -115,6 +118,9 @@ const parseLlmResponse = (rawText) => {
     const parsed = JSON.parse(candidate.trim());
     if (Array.isArray(parsed)) return parsed;
     if (parsed.insights && Array.isArray(parsed.insights)) return parsed.insights;
+    for (const val of Object.values(parsed)) {
+      if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') return val;
+    }
   }
 
   throw new Error('Failed to parse valid JSON array from LLM response');
@@ -294,7 +300,7 @@ const callAnthropic = async (apiKey, userPrompt) => {
  * Call Google Gemini REST API
  */
 const callGemini = async (apiKey, userPrompt) => {
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   console.log(`[LLM Service] Calling Google Gemini API (model: ${model})...`);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -329,7 +335,11 @@ const callGemini = async (apiKey, userPrompt) => {
   }
 
   const json = await response.json();
-  const content = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = json.candidates?.[0];
+  const parts = candidate?.content?.parts || [];
+  // In Gemini 2.5+, thoughts may be in a part with { thought: true }. Extract the non-thought content part:
+  const textPart = parts.find((p) => !p.thought && p.text) || parts[parts.length - 1];
+  const content = textPart?.text;
   return parseLlmResponse(content);
 };
 
