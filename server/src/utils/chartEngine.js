@@ -285,10 +285,10 @@ export const generateAutoCharts = (dataset) => {
   const numberColumns = columns.filter((c) => c.type === 'number');
   const textColumns = columns.filter((c) => c.type === 'text');
 
-  if (numberColumns.length === 0 && textColumns.length === 0) {
+  if (numberColumns.length === 0) {
     return {
       canChart: false,
-      reason: 'No numeric or categorical columns detected in this dataset. Try uploading a dataset containing numbers and dates.',
+      reason: 'No numeric columns detected in this dataset. Please upload a dataset containing numeric metrics (e.g., Revenue, Sales, Units, Profit) to generate meaningful charts and KPIs.',
       kpis: [],
       charts: [],
     };
