@@ -76,6 +76,10 @@ const datasetSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: null,
     },
+    insightsCache: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     status: {
       type: String,
       enum: ['processing', 'ready', 'failed'],

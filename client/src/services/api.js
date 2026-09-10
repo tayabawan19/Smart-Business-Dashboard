@@ -97,6 +97,12 @@ export const api = {
     return request(`/datasets/${id}/analysis`, { method: 'GET' });
   },
 
+  // Get AI plain-English business insights (Phase 5)
+  getDatasetInsights: async (id, refresh = false) => {
+    const query = refresh ? '?refresh=true' : '';
+    return request(`/datasets/${id}/insights${query}`, { method: 'GET' });
+  },
+
   // Delete a dataset
   deleteDataset: async (id) => {
     return request(`/datasets/${id}`, { method: 'DELETE' });

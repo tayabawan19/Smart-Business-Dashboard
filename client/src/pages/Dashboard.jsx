@@ -4,11 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useDatasetCharts } from '../hooks/useDatasetCharts';
 import { useDatasetAnalysis } from '../hooks/useDatasetAnalysis';
+import { useDatasetInsights } from '../hooks/useDatasetInsights';
 import { KpiCard } from '../components/charts/KpiCard';
 import { LineChartCard } from '../components/charts/LineChartCard';
 import { BarChartCard } from '../components/charts/BarChartCard';
 import { PieChartCard } from '../components/charts/PieChartCard';
 import { AnalysisSummarySection } from '../components/analysis/AnalysisSummarySection';
+import { AiInsightCardsSection } from '../components/insights/AiInsightCardsSection';
 import {
   Sparkles,
   UploadCloud,
@@ -99,9 +101,22 @@ export const Dashboard = () => {
     refetch: refetchAnalysis,
   } = useDatasetAnalysis(selectedDatasetId);
 
+  // Custom hook to fetch plain-English AI business insights (Phase 5)
+  const {
+    insights: aiInsights,
+    loading: loadingInsights,
+    refreshing: refreshingInsights,
+    error: insightsError,
+    isCached: isInsightsCached,
+    provider: insightsProvider,
+    mode: insightsMode,
+    refetch: refetchInsights,
+  } = useDatasetInsights(selectedDatasetId);
+
   const handleRefreshAll = () => {
     refetch();
     refetchAnalysis();
+    refetchInsights(true);
   };
 
   const selectedDataset = datasets.find((d) => d._id === selectedDatasetId);
@@ -128,10 +143,10 @@ export const Dashboard = () => {
       badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
     },
     {
-      phase: 'Phase 5: Next Up',
-      title: 'AI Intelligence & Forecasting',
-      desc: 'LLM-driven anomaly explanations, conversational queries, and automated forecast projections.',
-      status: 'Planned',
+      phase: 'Phase 5: Active',
+      title: 'AI Insights & Executive Layer',
+      desc: 'LLM plain-English business narratives, anomaly explanations, and actionable takeaways.',
+      status: 'Active',
       icon: BrainCircuit,
       color: 'from-purple-500/20 to-purple-500/5',
       borderColor: 'border-purple-500/30',
@@ -323,7 +338,19 @@ export const Dashboard = () => {
                 </div>
               )}
 
-              {/* 2. Auto-Generated Charts Grid */}
+              {/* 2. AI Business Insights & Executive Takeaways (Phase 5) */}
+              <AiInsightCardsSection
+                insights={aiInsights}
+                loading={loadingInsights}
+                refreshing={refreshingInsights}
+                error={insightsError}
+                isCached={isInsightsCached}
+                provider={insightsProvider}
+                mode={insightsMode}
+                onRefresh={refetchInsights}
+              />
+
+              {/* 3. Auto-Generated Charts Grid */}
               {chartData.charts && chartData.charts.length > 0 ? (
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center space-x-2">

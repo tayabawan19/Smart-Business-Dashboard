@@ -10,6 +10,7 @@ import {
 } from '../controllers/dataset.controller.js';
 import { getDatasetCharts } from '../controllers/chart.controller.js';
 import { getDatasetAnalysis } from '../controllers/analysis.controller.js';
+import { getDatasetInsights } from '../controllers/insights.controller.js';
 
 const router = Router();
 
@@ -58,6 +59,21 @@ const analysisLimiter = rateLimit({
   },
 });
 
+// Rate limiter for AI Insights: max 15 requests per 1 hour per user (cost protection)
+const insightLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too Many Requests',
+    message: "You've reached the insight refresh limit (15 per hour). Please try again in a bit.",
+  },
+  keyGenerator: (req) => {
+    return req.user?.uid || req.ip || 'anonymous-insight-requester';
+  },
+});
+
 // All dataset routes require authentication
 router.use(verifyAuth);
 
@@ -101,6 +117,13 @@ router.get('/datasets/:id/charts', chartLimiter, getDatasetCharts);
  * @access  Private
  */
 router.get('/datasets/:id/analysis', analysisLimiter, getDatasetAnalysis);
+
+/**
+ * @route   GET /api/datasets/:id/insights
+ * @desc    Get plain-English AI explanations powered by LLM API (Phase 5)
+ * @access  Private
+ */
+router.get('/datasets/:id/insights', insightLimiter, getDatasetInsights);
 
 /**
  * @route   DELETE /api/datasets/:id
