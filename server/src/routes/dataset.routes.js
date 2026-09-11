@@ -12,6 +12,11 @@ import { getDatasetCharts } from '../controllers/chart.controller.js';
 import { getDatasetAnalysis } from '../controllers/analysis.controller.js';
 import { getDatasetInsights } from '../controllers/insights.controller.js';
 import { getDatasetForecast } from '../controllers/forecast.controller.js';
+import {
+  sendChatMessage,
+  getChatHistory,
+  clearChatHistory,
+} from '../controllers/chat.controller.js';
 
 const router = Router();
 
@@ -90,6 +95,21 @@ const forecastLimiter = rateLimit({
   },
 });
 
+// Rate limiter for Chat: max 20 messages per 1 hour per user (cost & token protection)
+const chatLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too Many Requests',
+    message: "You've reached your chat limit (20 questions per hour). Please wait before asking more questions.",
+  },
+  keyGenerator: (req) => {
+    return req.user?.uid || req.ip || 'anonymous-chat-user';
+  },
+});
+
 // All dataset routes require authentication
 router.use(verifyAuth);
 
@@ -147,6 +167,27 @@ router.get('/datasets/:id/insights', insightLimiter, getDatasetInsights);
  * @access  Private
  */
 router.get('/datasets/:id/forecast', forecastLimiter, getDatasetForecast);
+
+/**
+ * @route   POST /api/datasets/:id/chat
+ * @desc    Ask questions about dataset with anti-hallucination grounded context (Phase 7)
+ * @access  Private
+ */
+router.post('/datasets/:id/chat', chatLimiter, sendChatMessage);
+
+/**
+ * @route   GET /api/datasets/:id/chat/history
+ * @desc    Fetch chat history for this dataset
+ * @access  Private
+ */
+router.get('/datasets/:id/chat/history', getChatHistory);
+
+/**
+ * @route   DELETE /api/datasets/:id/chat/history
+ * @desc    Clear chat history for this dataset
+ * @access  Private
+ */
+router.delete('/datasets/:id/chat/history', clearChatHistory);
 
 /**
  * @route   DELETE /api/datasets/:id

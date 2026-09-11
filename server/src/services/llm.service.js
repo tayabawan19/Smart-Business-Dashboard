@@ -555,3 +555,341 @@ Please provide ONE natural plain-English sentence summarizing this trend and nea
   };
 };
 
+/**
+ * Chat System Prompt for Phase 7 (Chat With Your Data)
+ * Strict anti-hallucination, grounding, and persona constraints.
+ */
+const CHAT_SYSTEM_PROMPT = `You are a friendly, concise business analyst answering questions about a user's uploaded business dataset.
+
+CORE RULES:
+1. ONLY answer using the verified dataset context provided below (statistical summary, performers, trends, anomalies, forecast projections, and targeted lookup results).
+2. If the answer cannot be determined from the provided dataset context, or if the question refers to columns, dates, or concepts not present in the data, you MUST say:
+   "I don't have enough information in this dataset to answer that."
+   You may add a short, polite explanation of what data is available or missing.
+3. NEVER make up, assume, or hallucinate numbers, names, or causes not grounded in the data.
+4. If the question is completely unrelated to this dataset (e.g. asking for code, world trivia, weather, jokes, or opinions), politely decline and prompt the user to ask about their business data.
+5. Keep your answers direct and concise (2-4 clear sentences).
+6. Always state any forecast or projection as an estimate based on historical trends, never as a guaranteed certainty.
+7. Use clean Markdown for readability (bold key numbers, bullet points where comparing items).`;
+
+/**
+ * Build compact context string for chat prompt
+ */
+const buildChatContext = (analysisData, forecastData, targetedQueryResult, datasetName) => {
+  const { summary, statistics = [], trends = [], performers = [], outliers = [], correlations = [] } = analysisData || {};
+
+  const ctx = {
+    datasetName: datasetName || 'Business Dataset',
+    rowCount: analysisData?.rowCount || 0,
+    columns: summary?.columns || (statistics.map(s => s.column) || []),
+    metricSummaries: statistics.slice(0, 6).map(s => ({
+      column: s.column,
+      totalSum: s.sum,
+      average: s.mean,
+      median: s.median,
+      min: s.min,
+      max: s.max,
+    })),
+    keyTrends: trends.slice(0, 3).map(t => ({
+      metric: t.numericColumn,
+      period: t.period,
+      direction: t.trend,
+      totalChangePercent: `${t.totalChangePercent}%`,
+      averageGrowthRate: `${t.averageGrowthRate}%`,
+      latestValue: t.latestValue,
+    })),
+    topAndBottomPerformers: performers.slice(0, 3).map(p => ({
+      category: p.categoryColumn,
+      metric: p.numericColumn,
+      topLeader: p.topPerformers?.[0] ? `${p.topPerformers[0].category} (${p.topPerformers[0].sharePercent}% share, total ${p.topPerformers[0].totalValue})` : null,
+      topRunnerUp: p.topPerformers?.[1] ? `${p.topPerformers[1].category} (${p.topPerformers[1].sharePercent}% share)` : null,
+      bottomLaggard: p.bottomPerformers?.[0] ? `${p.bottomPerformers[0].category} (${p.bottomPerformers[0].sharePercent}% share)` : null,
+    })),
+    anomalies: outliers.slice(0, 3).map(o => ({
+      metric: o.column,
+      count: o.outlierCount,
+      percentageOfData: `${o.outlierPercentage}%`,
+      sampleFlagged: o.topOutliers?.slice(0, 2).map(r => `Row ${r.rowIndex}: value ${r.value} (threshold ${r.threshold})`),
+    })),
+    correlations: correlations.slice(0, 2).map(c => ({
+      metrics: `${c.columnA} & ${c.columnB}`,
+      strength: c.strength,
+      insight: c.insight,
+    })),
+    forecast: forecastData?.canForecast ? {
+      metric: forecastData.numericColumn,
+      granularity: forecastData.granularity,
+      trend: forecastData.trend,
+      growthRatePercent: `${forecastData.growthRatePercent}%`,
+      lastActualValue: forecastData.lastActualValue,
+      nextProjectedValue: forecastData.nextProjectedValue,
+      nextPeriod: forecastData.periods?.[0],
+      projectedPeriods: forecastData.periods?.slice(0, 3).map((p, i) => `${p}: ~${forecastData.values?.[i]}`),
+    } : null,
+  };
+
+  if (targetedQueryResult) {
+    ctx.targetedQueryResult = targetedQueryResult;
+  }
+
+  return JSON.stringify(ctx, null, 2);
+};
+
+/**
+ * Intelligent Local Synthesizer for Chat (Phase 7 Fallback)
+ * Formulates accurate, grounded answers when LLM keys are not configured or offline.
+ */
+export const synthesizeLocalChatAnswer = (question, analysisData, forecastData, targetedQueryResult, datasetName = 'Business Dataset') => {
+  const q = (question || '').toLowerCase().trim();
+  const stats = analysisData?.statistics || [];
+  const trends = analysisData?.trends || [];
+  const performers = analysisData?.performers || [];
+  const outliers = analysisData?.outliers || [];
+  const columns = analysisData?.summary?.columns || stats.map(s => s.column);
+
+  // 1. If targeted query result is present, answer directly from it
+  if (targetedQueryResult && targetedQueryResult.success) {
+    const matchCount = targetedQueryResult.matchCount ?? targetedQueryResult.count ?? 0;
+    const aggVal = targetedQueryResult.aggregatedValue ?? targetedQueryResult.aggregation?.value;
+    const aggOp = (targetedQueryResult.aggregationFunction ?? targetedQueryResult.aggregation?.operation ?? 'calculation').toUpperCase();
+    const targetCol = targetedQueryResult.targetColumn ?? targetedQueryResult.aggregation?.column ?? 'metric';
+    const samples = targetedQueryResult.samples || targetedQueryResult.records || [];
+
+    if (aggVal !== null && aggVal !== undefined) {
+      return `Based on your dataset, the **${aggOp}** for **${targetCol}** is **${Number(aggVal).toLocaleString()}** (calculated across ${matchCount} matching record${matchCount === 1 ? '' : 's'}).`;
+    }
+    if (samples.length > 0) {
+      const sample = samples[0];
+      const details = Object.entries(sample).slice(0, 5).map(([k, v]) => `**${k}**: ${v}`).join(', ');
+      return `Found **${matchCount}** matching record${matchCount === 1 ? '' : 's'} in ${datasetName}. For example: ${details}.`;
+    }
+    if (matchCount === 0) {
+      return `I checked the dataset for that specific filter, but found no matching records.`;
+    }
+  }
+
+  // 2. Greetings
+  if (/^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening))/i.test(q)) {
+    return `Hello! I'm your data assistant for **${datasetName}**. You can ask me about total sales, highest/lowest values, top-performing categories, growth trends, unusual outliers, or future forecasts.`;
+  }
+
+  // 3. Question about available columns or summary
+  if (/columns|fields|what\s*(is\s*in|does)\s*(this|the)\s*data/i.test(q)) {
+    return `This dataset contains **${analysisData?.rowCount || 0}** rows across the following columns: **${columns.join(', ')}**. What specific metric would you like to explore?`;
+  }
+
+  // 4. Forecast / Future questions
+  if (/forecast|future|next\s*(month|quarter|week|period)|predict|projection/i.test(q)) {
+    if (forecastData && forecastData.canForecast) {
+      const nextPeriod = forecastData.periods?.[0] || 'the next period';
+      const nextVal = forecastData.nextProjectedValue != null ? Number(forecastData.nextProjectedValue).toLocaleString() : 'N/A';
+      return `Based on historical trends in **${forecastData.numericColumn}**, the model projects a **${forecastData.trend}** trajectory (approx. ${forecastData.growthRatePercent}% change per period). The estimated value for **${nextPeriod}** is approximately **${nextVal}** — though please note this is a projection, not a guarantee.`;
+    } else {
+      return `I don't have enough chronological data in this dataset to generate a forecast projection. To enable forecasting, please ensure your dataset includes a date column with multiple distinct time periods.`;
+    }
+  }
+
+  // 5. Outliers / Anomalies
+  if (/outlier|anomaly|anomalies|spike|unusual|odd/i.test(q)) {
+    if (outliers.length > 0 && outliers[0].outlierCount > 0) {
+      const o = outliers[0];
+      const sample = o.topOutliers?.[0];
+      return `We detected **${o.outlierCount}** unusual spike${o.outlierCount > 1 ? 's' : ''} in **${o.column}** (${o.outlierPercentage}% of records). ${
+        sample ? `For example, row #${sample.rowIndex} showed a value of **${Number(sample.value).toLocaleString()}**, well beyond the typical threshold of ${Number(sample.threshold).toLocaleString()}.` : ''
+      }`;
+    }
+    return `No significant statistical anomalies or unusual spikes were detected in this dataset. All values reside within normal operating distributions.`;
+  }
+
+  // 6. Top / Best / Leader performer
+  if (/top|best|leader|highest\s*performing|most\s*(popular|sold)/i.test(q)) {
+    if (performers.length > 0 && performers[0].topPerformers?.length > 0) {
+      const p = performers[0];
+      const leader = p.topPerformers[0];
+      const runnerUp = p.topPerformers[1];
+      return `The top performer in **${p.categoryColumn}** by **${p.numericColumn}** is **${leader.category}**, accounting for **${leader.sharePercent}%** of the total (${Number(leader.totalValue).toLocaleString()}). ${
+        runnerUp ? `**${runnerUp.category}** followed with **${runnerUp.sharePercent}%**.` : ''
+      }`;
+    }
+  }
+
+  // 7. Worst / Lowest / Laggard performer
+  if (/worst|lowest|laggard|least|bottom/i.test(q)) {
+    if (performers.length > 0 && performers[0].bottomPerformers?.length > 0) {
+      const p = performers[0];
+      const laggard = p.bottomPerformers[0];
+      return `The lowest contributing category in **${p.categoryColumn}** for **${p.numericColumn}** is **${laggard.category}**, which represents just **${laggard.sharePercent}%** of the total (${Number(laggard.totalValue).toLocaleString()}).`;
+    }
+  }
+
+  // 8. Trends / Growth
+  if (/trend|growth|growing|direction|rise|decline|drop/i.test(q)) {
+    if (trends.length > 0) {
+      const t = trends[0];
+      return `Over the analyzed periods, **${t.numericColumn}** has exhibited a **${t.trend}** trend, with an overall change of **${t.totalChangePercent}%** and an average growth rate of **${t.averageGrowthRate}%** per period.`;
+    }
+  }
+
+  // 9. Numeric column questions (total, average, max, min)
+  for (const s of stats) {
+    const colLower = s.column.toLowerCase();
+    if (q.includes(colLower) || (colLower.includes('sale') && q.includes('sale')) || (colLower.includes('revenue') && (q.includes('revenue') || q.includes('made')))) {
+      if (/total|sum|overall|how\s*much|revenue/i.test(q)) {
+        return `The total **${s.column}** across all ${analysisData.rowCount} records is **${Number(s.sum).toLocaleString()}**, with an average of **${Number(s.mean).toLocaleString()}** per record.`;
+      }
+      if (/average|mean|typical/i.test(q)) {
+        return `The average **${s.column}** is **${Number(s.mean).toLocaleString()}**, with a median (typical midpoint) of **${Number(s.median).toLocaleString()}**.`;
+      }
+      if (/highest|maximum|max|peak/i.test(q)) {
+        return `The highest recorded **${s.column}** in this dataset is **${Number(s.max).toLocaleString()}** (the lowest is ${Number(s.min).toLocaleString()}).`;
+      }
+      if (/lowest|minimum|min/i.test(q)) {
+        return `The lowest recorded **${s.column}** in this dataset is **${Number(s.min).toLocaleString()}** (the highest is ${Number(s.max).toLocaleString()}).`;
+      }
+      return `For **${s.column}**, the total is **${Number(s.sum).toLocaleString()}**, the average is **${Number(s.mean).toLocaleString()}**, and values range between **${Number(s.min).toLocaleString()}** and **${Number(s.max).toLocaleString()}**.`;
+    }
+  }
+
+  // 10. General Total Revenue / Sales if no specific column matched but general term used
+  if (/total|revenue|sales|profit|how\s*much/i.test(q) && stats.length > 0) {
+    const primary = stats[0];
+    return `The total **${primary.column}** is **${Number(primary.sum).toLocaleString()}**, with an average of **${Number(primary.mean).toLocaleString()}** across **${analysisData.rowCount || 0}** rows.`;
+  }
+
+  // 11. Strict anti-hallucination refusal for questions that cannot be answered from dataset
+  return `I don't have enough information in this dataset to answer that. The dataset contains **${columns.join(', ')}**, but doesn't include data to support that specific question.`;
+};
+
+/**
+ * Generate a grounded conversational response to a user question (Phase 7)
+ */
+export const generateChatAnswer = async ({
+  question,
+  conversationHistory = [],
+  analysisData,
+  forecastData,
+  targetedQueryResult = null,
+  datasetName = 'Business Dataset',
+}) => {
+  const preferredProvider = (process.env.LLM_PROVIDER || 'auto').toLowerCase();
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+
+  let provider = 'fallback';
+  if (preferredProvider === 'openai' && openAiKey) provider = 'openai';
+  else if (preferredProvider === 'anthropic' && anthropicKey) provider = 'anthropic';
+  else if (preferredProvider === 'gemini' && geminiKey) provider = 'gemini';
+  else if (openAiKey) provider = 'openai';
+  else if (anthropicKey) provider = 'anthropic';
+  else if (geminiKey) provider = 'gemini';
+
+  const contextStr = buildChatContext(analysisData, forecastData, targetedQueryResult, datasetName);
+  const boundedHistory = (conversationHistory || []).slice(-6);
+
+  if (provider !== 'fallback') {
+    try {
+      console.log(`[LLM Service] Generating chat answer via ${provider}...`);
+
+      if (provider === 'openai') {
+        const messages = [
+          { role: 'system', content: `${CHAT_SYSTEM_PROMPT}\n\n${contextStr}` },
+          ...boundedHistory.map(m => ({ role: m.role, content: m.content })),
+          { role: 'user', content: question },
+        ];
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
+          body: JSON.stringify({
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            messages,
+            temperature: 0.2,
+            max_tokens: 450,
+          }),
+          signal: AbortSignal.timeout(18000),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const answer = json.choices?.[0]?.message?.content?.trim();
+          if (answer) {
+            return { answer, provider, mode: 'live-llm', queryContext: targetedQueryResult };
+          }
+        }
+      } else if (provider === 'anthropic') {
+        const messages = [
+          ...boundedHistory.map(m => ({ role: m.role, content: m.content })),
+          { role: 'user', content: question },
+        ];
+
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
+            system: `${CHAT_SYSTEM_PROMPT}\n\n${contextStr}`,
+            messages,
+            max_tokens: 450,
+            temperature: 0.2,
+          }),
+          signal: AbortSignal.timeout(18000),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const answer = json.content?.[0]?.text?.trim();
+          if (answer) {
+            return { answer, provider, mode: 'live-llm', queryContext: targetedQueryResult };
+          }
+        }
+      } else if (provider === 'gemini') {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent?key=${geminiKey}`;
+        const contents = [
+          ...boundedHistory.map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          })),
+          { role: 'user', parts: [{ text: `CONTEXT:\n${contextStr}\n\nQUESTION: ${question}` }] },
+        ];
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
+            contents,
+            generationConfig: { temperature: 0.2, maxOutputTokens: 450 },
+          }),
+          signal: AbortSignal.timeout(18000),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const parts = json.candidates?.[0]?.content?.parts || [];
+          const textPart = parts.find(p => !p.thought && p.text) || parts[parts.length - 1];
+          const answer = textPart?.text?.trim();
+          if (answer) {
+            return { answer, provider, mode: 'live-llm', queryContext: targetedQueryResult };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[LLM Service] Chat LLM call failed (${provider}):`, err.message);
+    }
+  }
+
+  // Intelligent local synthesizer fallback
+  const fallbackAnswer = synthesizeLocalChatAnswer(question, analysisData, forecastData, targetedQueryResult, datasetName);
+  return {
+    answer: fallbackAnswer,
+    provider: provider !== 'fallback' ? `${provider} (fallback)` : 'local-synthesizer',
+    mode: 'rule-synthesizer',
+    queryContext: targetedQueryResult,
+  };
+};
+

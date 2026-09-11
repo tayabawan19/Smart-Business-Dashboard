@@ -33,6 +33,7 @@ const request = async (endpoint, options = {}) => {
 
   const headers = {
     Authorization: `Bearer ${token}`,
+    ...(options.body && typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
   };
 
@@ -109,8 +110,27 @@ export const api = {
     return request(`/datasets/${id}/forecast${query}`, { method: 'GET' });
   },
 
+  // Send a chat question about the dataset (Phase 7)
+  sendChatMessage: async (id, question, conversationHistory = []) => {
+    return request(`/datasets/${id}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ question, conversationHistory }),
+    });
+  },
+
+  // Get chat history for dataset (Phase 7)
+  getChatHistory: async (id) => {
+    return request(`/datasets/${id}/chat/history`, { method: 'GET' });
+  },
+
+  // Clear chat history for dataset (Phase 7)
+  clearChatHistory: async (id) => {
+    return request(`/datasets/${id}/chat/history`, { method: 'DELETE' });
+  },
+
   // Delete a dataset
   deleteDataset: async (id) => {
     return request(`/datasets/${id}`, { method: 'DELETE' });
   },
 };
+

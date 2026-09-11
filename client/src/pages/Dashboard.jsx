@@ -13,6 +13,7 @@ import { PieChartCard } from '../components/charts/PieChartCard';
 import { AnalysisSummarySection } from '../components/analysis/AnalysisSummarySection';
 import { AiInsightCardsSection } from '../components/insights/AiInsightCardsSection';
 import { ForecastSection } from '../components/forecast/ForecastSection';
+import { ChatDrawer } from '../components/chat/ChatDrawer';
 import {
   Sparkles,
   UploadCloud,
@@ -28,6 +29,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Zap,
+  MessageSquare,
+  Bot,
 } from 'lucide-react';
 
 export const Dashboard = () => {
@@ -37,6 +40,7 @@ export const Dashboard = () => {
   const [datasets, setDatasets] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const [loadingDatasets, setLoadingDatasets] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const userEmail = currentUser?.email || 'user@example.com';
 
@@ -137,7 +141,7 @@ export const Dashboard = () => {
   const phaseCards = [
     {
       phase: 'Phase 1 & 2',
-      title: 'Foundation & File Ingestion',
+      title: 'Foundation & Ingestion',
       desc: 'Auth, MongoDB, in-memory parsing for CSV & Excel with formula injection defense.',
       status: 'Active',
       icon: ShieldCheck,
@@ -147,8 +151,8 @@ export const Dashboard = () => {
     },
     {
       phase: 'Phase 3 & 4',
-      title: 'Auto-Charting & Python Stats Engine',
-      desc: 'Auto-charts, KPIs, trend analysis, top/bottom performers, IQR outliers, and Pearson correlations.',
+      title: 'Visuals & Python Engine',
+      desc: 'Auto-charts, KPIs, trend analysis, top/bottom performers, IQR outliers, and correlations.',
       status: 'Active',
       icon: LineChart,
       color: 'from-brand-500/20 to-brand-500/5',
@@ -156,14 +160,24 @@ export const Dashboard = () => {
       badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
     },
     {
-      phase: 'Phase 5 & 6: Active',
-      title: 'AI Insights & Forecast Module',
-      desc: 'LLM plain-English business narratives, linear trend projections, and honesty-caveated estimates.',
+      phase: 'Phase 5 & 6',
+      title: 'AI Insights & Forecasts',
+      desc: 'Plain-English business narratives, linear trend projections, and honesty-caveated estimates.',
       status: 'Active',
       icon: Sparkles,
       color: 'from-purple-500/20 to-purple-500/5',
       borderColor: 'border-purple-500/30',
       badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    },
+    {
+      phase: 'Phase 7',
+      title: 'Chat With Your Data',
+      desc: 'Natural language Q&A, targeted Python microservice query verification & anti-hallucination defense.',
+      status: 'Active',
+      icon: MessageSquare,
+      color: 'from-indigo-500/20 to-indigo-500/5',
+      borderColor: 'border-indigo-500/30',
+      badgeColor: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
     },
   ];
 
@@ -177,20 +191,20 @@ export const Dashboard = () => {
           <div className="space-y-2">
             <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold">
               <Zap className="w-3.5 h-3.5 text-brand-400" />
-              <span>Phase 3: Auto-Charting Engine</span>
+              <span>Phase 7: Chat With Your Data Active</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-indigo-300">{userEmail}</span>
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-              Auto-generated analytics and visual insights from your uploaded business spreadsheets.
+              Auto-generated analytics, predictive forecasts, and natural language data chat for your business spreadsheets.
             </p>
           </div>
 
-          {/* Dataset Switcher Dropdown */}
+          {/* Dataset Switcher Dropdown & Action Buttons */}
           {datasets.length > 0 && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative min-w-[240px]">
+              <div className="relative min-w-[220px]">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Active Dataset
                 </label>
@@ -210,7 +224,16 @@ export const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="self-end sm:self-auto pt-4 sm:pt-4">
+              <div className="self-end sm:self-auto pt-4 sm:pt-4 flex items-center gap-2">
+                <button
+                  onClick={() => setIsChatOpen(true)}
+                  className="flex items-center space-x-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-brand-500/20 transition-all transform hover:scale-[1.02]"
+                  title="Ask questions about this dataset"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">Chat With Data</span>
+                </button>
+
                 <button
                   onClick={handleRefreshAll}
                   disabled={loadingCharts || loadingAnalysis}
@@ -280,9 +303,18 @@ export const Dashboard = () => {
                 </span>
               )}
 
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(true)}
+                className="text-xs font-semibold text-white bg-brand-600/90 hover:bg-brand-500 px-3 py-1.5 rounded-lg border border-brand-500/40 flex items-center space-x-1.5 transition-all shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-brand-200 animate-pulse" />
+                <span>Ask Data AI</span>
+              </button>
+
               <Link
                 to="/upload"
-                className="text-xs font-semibold text-brand-400 hover:text-brand-300 px-3 py-1 rounded-lg border border-brand-500/20 hover:bg-brand-950/40 transition-colors"
+                className="text-xs font-semibold text-brand-400 hover:text-brand-300 px-3 py-1.5 rounded-lg border border-brand-500/20 hover:bg-brand-950/40 transition-colors"
               >
                 + Upload Another
               </Link>
@@ -424,10 +456,10 @@ export const Dashboard = () => {
             <Layers className="w-4 h-4 text-brand-400" />
             <span>Implementation Roadmap</span>
           </h2>
-          <span className="text-xs text-brand-400 font-semibold">Phase 3 Complete</span>
+          <span className="text-xs text-brand-400 font-semibold">Phase 7 Active</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {phaseCards.map((card, idx) => {
             const Icon = card.icon;
             return (
@@ -462,6 +494,35 @@ export const Dashboard = () => {
           })}
         </div>
       </div>
+
+      {/* Floating Chat Action Button */}
+      {selectedDatasetId && (
+        <div className="fixed bottom-6 right-6 z-30">
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(true)}
+            className="flex items-center gap-2.5 px-5 py-3.5 rounded-full bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-bold shadow-2xl shadow-brand-500/40 border border-white/20 transition-all transform hover:scale-105 active:scale-95 group cursor-pointer"
+          >
+            <div className="relative">
+              <MessageSquare className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+            </div>
+            <span>Chat With Data</span>
+            <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide bg-white/20 rounded-full">
+              Phase 7
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Slide-Over Chat Drawer Component */}
+      <ChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        datasetId={selectedDatasetId}
+        datasetName={selectedDataset?.fileName}
+      />
     </div>
   );
 };
+

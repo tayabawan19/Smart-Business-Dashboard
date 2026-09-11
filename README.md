@@ -173,9 +173,15 @@ npm run dev
 - Extended Recharts interactive visualization combining historical actuals (solid), projected estimates (dashed purple), and shaded confidence interval envelope.
 - Prominent UX honesty notices, disclaimers, and interactive tooltips.
 
+### ✅ Phase 7: Chat With Your Data
+- Natural language conversational Q&A grounded in structured dataset analysis summaries and targeted pandas query execution.
+- Python microservice `POST /query` endpoint with parameterized filters and aggregations (sum, mean, count, min, max).
+- MongoDB chat history persistence with `ChatMessage` collection (`GET` / `DELETE` history).
+- Rate-limiting (20 msgs/hour), token context bounds (last 6 exchanges), and strict anti-hallucination prompt refusal.
+- Slide-over chat drawer with suggested starter prompt chips, real-time typing indicators, and grounded verification badges.
+
 ---
 
-## 🔮 Next: Phase 7 & 8
-- **Phase 7: Chat-with-Data Engine**: Conversational Q&A querying datasets and statistical metrics.
+## 🔮 Next: Phase 8
 - **Phase 8: PDF Report Export**: Export executive summary dashboards into print-ready PDF reports.
 

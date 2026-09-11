@@ -17,6 +17,7 @@ import pandas as pd
 
 from analyzer import run_full_analysis
 from forecaster import compute_forecast
+from query_engine import execute_safe_query
 
 # Load environment configuration
 load_dotenv()
@@ -98,6 +99,33 @@ class ForecastRequest(BaseModel):
             raise ValueError(f"Dataset exceeds the maximum limit of {MAX_ROWS:,} rows for forecasting (received {len(v):,}).")
         return v
 
+class QueryFilterSpec(BaseModel):
+    column: str
+    operator: Optional[str] = "equals"
+    value: Any = None
+
+class QueryAggregationSpec(BaseModel):
+    target_column: Optional[str] = None
+    column: Optional[str] = None
+    function: Optional[str] = None
+    operation: Optional[str] = "sum"
+
+class QueryRequest(BaseModel):
+    dataset_id: Optional[str] = Field(default=None, description="Unique identifier of dataset")
+    columns: List[ColumnInfo] = Field(default_factory=list, description="Dataset column metadata")
+    data: List[Dict[str, Any]] = Field(default_factory=list, description="Dataset rows")
+    filter: Optional[QueryFilterSpec] = Field(default=None, description="Filter criteria")
+    filters: Optional[List[QueryFilterSpec]] = Field(default=None, description="List of filter criteria")
+    aggregation: Optional[QueryAggregationSpec] = Field(default=None, description="Aggregation specification")
+    limit: Optional[int] = Field(default=10, ge=1, le=50, description="Max sample rows to return")
+
+    @field_validator("data")
+    @classmethod
+    def validate_row_limit(cls, v):
+        if len(v) > MAX_ROWS:
+            raise ValueError(f"Dataset exceeds the maximum limit of {MAX_ROWS:,} rows for query (received {len(v):,}).")
+        return v
+
 # Security Dependency
 def verify_internal_key(x_internal_key: Optional[str] = Header(None, alias="X-Internal-Key")):
     """Verifies that the caller has provided the correct internal shared secret."""
@@ -170,6 +198,49 @@ async def forecast_dataset(payload: ForecastRequest, request: Request):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Forecast calculation failed: {str(e)}",
+        )
+
+@app.post("/query", tags=["Query"])
+async def query_dataset(payload: QueryRequest, request: Request):
+    """
+    Lightweight targeted dataset query endpoint (Phase 7).
+    Protected by X-Internal-Key header.
+    """
+    raw_key = request.headers.get("X-Internal-Key")
+    verify_internal_key(raw_key)
+
+    try:
+        raw_columns = [col.model_dump() for col in payload.columns]
+        df = pd.DataFrame(payload.data)
+        
+        filter_spec = None
+        if payload.filters and len(payload.filters) > 0:
+            filter_spec = [f.model_dump() for f in payload.filters]
+        elif payload.filter:
+            filter_spec = payload.filter.model_dump()
+
+        agg_dict = None
+        if payload.aggregation:
+            agg_dict = payload.aggregation.model_dump()
+            target_col = agg_dict.get("target_column") or agg_dict.get("column")
+            op = agg_dict.get("operation") or agg_dict.get("function") or "sum"
+            agg_dict["target_column"] = target_col
+            agg_dict["function"] = op
+
+        result = execute_safe_query(
+            df=df,
+            columns=raw_columns,
+            query_filter=filter_spec,
+            aggregation=agg_dict,
+            limit=payload.limit or 10,
+        )
+        result["datasetId"] = payload.dataset_id
+        return result
+    except Exception as e:
+        logger.error(f"Targeted query computation failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Targeted query execution failed: {str(e)}",
         )
 
 if __name__ == "__main__":
