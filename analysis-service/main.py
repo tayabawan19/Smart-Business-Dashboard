@@ -13,8 +13,10 @@ from fastapi import FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 import uvicorn
+import pandas as pd
 
 from analyzer import run_full_analysis
+from forecaster import compute_forecast
 
 # Load environment configuration
 load_dotenv()
@@ -81,6 +83,21 @@ class AnalysisRequest(BaseModel):
             raise ValueError(f"Dataset exceeds the maximum limit of {MAX_ROWS:,} rows for analysis (received {len(v):,}).")
         return v
 
+class ForecastRequest(BaseModel):
+    dataset_id: Optional[str] = Field(default=None, description="Unique identifier of dataset")
+    columns: List[ColumnInfo] = Field(default_factory=list, description="Dataset column metadata")
+    data: List[Dict[str, Any]] = Field(default_factory=list, description="Dataset rows")
+    target_numeric_column: Optional[str] = Field(default=None, description="Specific numeric column to forecast")
+    target_date_column: Optional[str] = Field(default=None, description="Specific date column for timeline")
+    periods_to_project: Optional[int] = Field(default=5, ge=3, le=6, description="Number of future periods to project")
+
+    @field_validator("data")
+    @classmethod
+    def validate_row_limit(cls, v):
+        if len(v) > MAX_ROWS:
+            raise ValueError(f"Dataset exceeds the maximum limit of {MAX_ROWS:,} rows for forecasting (received {len(v):,}).")
+        return v
+
 # Security Dependency
 def verify_internal_key(x_internal_key: Optional[str] = Header(None, alias="X-Internal-Key")):
     """Verifies that the caller has provided the correct internal shared secret."""
@@ -125,6 +142,34 @@ async def analyze_dataset(payload: AnalysisRequest, request: Request):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Statistical analysis calculation failed: {str(e)}",
+        )
+
+@app.post("/forecast", tags=["Forecasting"])
+async def forecast_dataset(payload: ForecastRequest, request: Request):
+    """
+    Time-series forecasting endpoint (Phase 6).
+    Protected by X-Internal-Key header.
+    """
+    raw_key = request.headers.get("X-Internal-Key")
+    verify_internal_key(raw_key)
+
+    try:
+        raw_columns = [col.model_dump() for col in payload.columns]
+        df = pd.DataFrame(payload.data)
+        result = compute_forecast(
+            df=df,
+            columns=raw_columns,
+            target_date_col=payload.target_date_column,
+            target_num_col=payload.target_numeric_column,
+            periods_to_project=payload.periods_to_project or 5,
+        )
+        result["datasetId"] = payload.dataset_id
+        return result
+    except Exception as e:
+        logger.error(f"Forecast computation failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Forecast calculation failed: {str(e)}",
         )
 
 if __name__ == "__main__":

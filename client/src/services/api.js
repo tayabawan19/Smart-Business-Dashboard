@@ -103,6 +103,12 @@ export const api = {
     return request(`/datasets/${id}/insights${query}`, { method: 'GET' });
   },
 
+  // Get predictive trend forecast with confidence ranges (Phase 6)
+  getDatasetForecast: async (id, refresh = false) => {
+    const query = refresh ? '?refresh=true' : '';
+    return request(`/datasets/${id}/forecast${query}`, { method: 'GET' });
+  },
+
   // Delete a dataset
   deleteDataset: async (id) => {
     return request(`/datasets/${id}`, { method: 'DELETE' });

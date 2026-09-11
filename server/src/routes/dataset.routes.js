@@ -11,6 +11,7 @@ import {
 import { getDatasetCharts } from '../controllers/chart.controller.js';
 import { getDatasetAnalysis } from '../controllers/analysis.controller.js';
 import { getDatasetInsights } from '../controllers/insights.controller.js';
+import { getDatasetForecast } from '../controllers/forecast.controller.js';
 
 const router = Router();
 
@@ -74,6 +75,21 @@ const insightLimiter = rateLimit({
   },
 });
 
+// Rate limiter for Forecasting: max 30 requests per 15 minutes per user
+const forecastLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too Many Requests',
+    message: 'Forecast request limit reached. Please wait a moment before requesting another forecast.',
+  },
+  keyGenerator: (req) => {
+    return req.user?.uid || req.ip || 'anonymous-forecaster';
+  },
+});
+
 // All dataset routes require authentication
 router.use(verifyAuth);
 
@@ -124,6 +140,13 @@ router.get('/datasets/:id/analysis', analysisLimiter, getDatasetAnalysis);
  * @access  Private
  */
 router.get('/datasets/:id/insights', insightLimiter, getDatasetInsights);
+
+/**
+ * @route   GET /api/datasets/:id/forecast
+ * @desc    Get predictive trend forecast with confidence ranges and AI narrative (Phase 6)
+ * @access  Private
+ */
+router.get('/datasets/:id/forecast', forecastLimiter, getDatasetForecast);
 
 /**
  * @route   DELETE /api/datasets/:id

@@ -412,3 +412,146 @@ export const generateBusinessInsights = async (analysisData, datasetName = 'Busi
     generatedAt: new Date().toISOString(),
   };
 };
+
+/**
+ * Intelligent Local Business Synthesizer for Forecast Explanation (Phase 6)
+ */
+export const synthesizeLocalForecastExplanation = (forecastData) => {
+  if (!forecastData || !forecastData.canForecast) {
+    return 'Insufficient historical time-series data to generate a forward projection.';
+  }
+
+  const {
+    numericColumn = 'Key metric',
+    historicalCount = 0,
+    granularity = 'monthly',
+    trend = 'stable',
+    growthRatePercent = 0,
+    nextProjectedValue,
+    periods = [],
+  } = forecastData;
+
+  const nextPeriodLabel = periods[0] || 'next period';
+  const formattedVal = nextProjectedValue != null ? `$${Number(nextProjectedValue).toLocaleString()}` : 'projected levels';
+  const periodTerm = granularity === 'monthly' ? 'months' : granularity === 'weekly' ? 'weeks' : 'days';
+
+  if (trend === 'upward') {
+    return `Based on the last ${historicalCount} ${periodTerm}, ${numericColumn} is trending upward and could reach approximately ${formattedVal} by ${nextPeriodLabel} — though this is an estimate, not a guarantee.`;
+  } else if (trend === 'downward') {
+    return `Based on the last ${historicalCount} ${periodTerm}, ${numericColumn} is trending downward and is projected to settle around ${formattedVal} by ${nextPeriodLabel} — though this is an estimate, not a guarantee.`;
+  } else {
+    return `Based on the last ${historicalCount} ${periodTerm}, ${numericColumn} has remained steady and is estimated to stay near ${formattedVal} by ${nextPeriodLabel} — though this is an estimate, not a guarantee.`;
+  }
+};
+
+const FORECAST_SYSTEM_PROMPT = `You are a friendly, senior business analyst explaining a near-future trend projection to a small business owner.
+YOUR CORE RULES:
+1. Provide exactly ONE clear, conversational plain-English sentence (max 35 words).
+2. ALWAYS caveat forecasts as estimates, never state them as certain fact (use words like "projected", "estimated", "could reach approximately", "though this is an estimate, not a guarantee").
+3. Strictly avoid technical statistics jargon (no "linear regression", "r-squared", "residuals", "p-value").
+4. Return ONLY a JSON object: { "explanation": "your sentence here" }.`;
+
+/**
+ * Generate ONE plain-English AI sentence explaining the forecast with strict estimate caveat (Phase 6)
+ */
+export const generateForecastExplanation = async (forecastData, datasetName = 'Business Dataset') => {
+  if (!forecastData || !forecastData.canForecast) {
+    return {
+      explanation: 'Insufficient historical data to generate a forward projection.',
+      provider: 'local-synthesizer',
+    };
+  }
+
+  const preferredProvider = (process.env.LLM_PROVIDER || 'auto').toLowerCase();
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+
+  let provider = 'fallback';
+  if (preferredProvider === 'openai' && openAiKey) provider = 'openai';
+  else if (preferredProvider === 'anthropic' && anthropicKey) provider = 'anthropic';
+  else if (preferredProvider === 'gemini' && geminiKey) provider = 'gemini';
+  else if (openAiKey) provider = 'openai';
+  else if (anthropicKey) provider = 'anthropic';
+  else if (geminiKey) provider = 'gemini';
+
+  const userPrompt = `Dataset: "${datasetName}".
+Metric: ${forecastData.numericColumn} over ${forecastData.granularity} periods.
+Historical periods analyzed: ${forecastData.historicalCount}.
+Historical direction: ${forecastData.trend} (growth rate: ${forecastData.growthRatePercent}% per period).
+Last actual value: ${forecastData.lastActualValue}.
+Next projected period (${forecastData.periods[0]}): approximately ${forecastData.nextProjectedValue}.
+Confidence range for next period: ${forecastData.confidenceRange?.[0]?.lower} to ${forecastData.confidenceRange?.[0]?.upper}.
+
+Please provide ONE natural plain-English sentence summarizing this trend and near-future projection, honestly caveating it as an estimate.`;
+
+  if (provider !== 'fallback') {
+    try {
+      console.log(`[LLM Service] Generating forecast explanation via ${provider}...`);
+      let rawContent = null;
+
+      if (provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
+          body: JSON.stringify({
+            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: FORECAST_SYSTEM_PROMPT },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.3,
+            max_tokens: 200,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          rawContent = json.choices?.[0]?.message?.content;
+        }
+      } else if (provider === 'gemini') {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent?key=${geminiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: FORECAST_SYSTEM_PROMPT }] },
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 200, responseMimeType: 'application/json' },
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const parts = json.candidates?.[0]?.content?.parts || [];
+          const textPart = parts.find((p) => !p.thought && p.text) || parts[parts.length - 1];
+          rawContent = textPart?.text;
+        }
+      }
+
+      if (rawContent) {
+        try {
+          const parsed = JSON.parse(rawContent.trim());
+          const sentence = parsed.explanation || parsed.sentence || Object.values(parsed)[0];
+          if (typeof sentence === 'string' && sentence.length > 10) {
+            return { explanation: sentence, provider, mode: 'live-llm' };
+          }
+        } catch (parseErr) {
+          // fallback below
+        }
+      }
+    } catch (err) {
+      console.warn(`[LLM Service] Forecast explanation LLM call failed (${provider}):`, err.message);
+    }
+  }
+
+  // Local fallback synthesizer
+  const localSentence = synthesizeLocalForecastExplanation(forecastData);
+  return {
+    explanation: localSentence,
+    provider: provider !== 'fallback' ? `${provider} (fallback)` : 'local-synthesizer',
+    mode: 'rule-synthesizer',
+  };
+};
+

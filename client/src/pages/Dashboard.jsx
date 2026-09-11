@@ -5,12 +5,14 @@ import { api } from '../services/api';
 import { useDatasetCharts } from '../hooks/useDatasetCharts';
 import { useDatasetAnalysis } from '../hooks/useDatasetAnalysis';
 import { useDatasetInsights } from '../hooks/useDatasetInsights';
+import { useDatasetForecast } from '../hooks/useDatasetForecast';
 import { KpiCard } from '../components/charts/KpiCard';
 import { LineChartCard } from '../components/charts/LineChartCard';
 import { BarChartCard } from '../components/charts/BarChartCard';
 import { PieChartCard } from '../components/charts/PieChartCard';
 import { AnalysisSummarySection } from '../components/analysis/AnalysisSummarySection';
 import { AiInsightCardsSection } from '../components/insights/AiInsightCardsSection';
+import { ForecastSection } from '../components/forecast/ForecastSection';
 import {
   Sparkles,
   UploadCloud,
@@ -113,10 +115,21 @@ export const Dashboard = () => {
     refetch: refetchInsights,
   } = useDatasetInsights(selectedDatasetId);
 
+  // Custom hook to fetch predictive trend forecast (Phase 6)
+  const {
+    forecastData,
+    loading: loadingForecast,
+    refreshing: refreshingForecast,
+    error: forecastError,
+    isCached: isForecastCached,
+    refetch: refetchForecast,
+  } = useDatasetForecast(selectedDatasetId);
+
   const handleRefreshAll = () => {
     refetch();
     refetchAnalysis();
     refetchInsights(true);
+    refetchForecast(true);
   };
 
   const selectedDataset = datasets.find((d) => d._id === selectedDatasetId);
@@ -143,11 +156,11 @@ export const Dashboard = () => {
       badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
     },
     {
-      phase: 'Phase 5: Active',
-      title: 'AI Insights & Executive Layer',
-      desc: 'LLM plain-English business narratives, anomaly explanations, and actionable takeaways.',
+      phase: 'Phase 5 & 6: Active',
+      title: 'AI Insights & Forecast Module',
+      desc: 'LLM plain-English business narratives, linear trend projections, and honesty-caveated estimates.',
       status: 'Active',
-      icon: BrainCircuit,
+      icon: Sparkles,
       color: 'from-purple-500/20 to-purple-500/5',
       borderColor: 'border-purple-500/30',
       badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
@@ -379,10 +392,20 @@ export const Dashboard = () => {
                   </p>
                 </div>
               )}
+
+              {/* 4. Predictive Trend Forecast Section (Phase 6) */}
+              <ForecastSection
+                forecastData={forecastData}
+                loading={loadingForecast}
+                refreshing={refreshingForecast}
+                error={forecastError}
+                isCached={isForecastCached}
+                onRefresh={refetchForecast}
+              />
             </>
           )}
 
-          {/* 3. Statistical Analysis & Key Insights Section (Phase 4 Python Microservice) */}
+          {/* 5. Statistical Analysis & Key Insights Section (Phase 4 Python Microservice) */}
           <AnalysisSummarySection
             analysisData={analysisData}
             loading={loadingAnalysis}

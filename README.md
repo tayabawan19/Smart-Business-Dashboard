@@ -158,7 +158,24 @@ npm run dev
 - **Pearson Correlations**: Cross-metric correlation coefficients with human-readable strength classifications.
 - Express backend caching (`analysisCache`) with 15-second timeout and graceful 503 fallback.
 
+### ✅ Phase 5: AI Explanation Layer
+- Multi-provider LLM integration (OpenAI, Claude, Gemini) with intelligent local business synthesizer fallback.
+- Plain-English business narratives explaining performance, outlier anomalies, and actionable takeaways.
+- Mongo caching (`insightsCache`) and hourly rate-limiting for cost and abuse control.
+
+### ✅ Phase 6: Predictive Forecast Module
+- Python FastAPI forecasting engine (`/forecast`) with `X-Internal-Key` authentication.
+- Lightweight linear trend extrapolation projecting the next 3 to 6 periods forward.
+- Minimum data validation: requires $\ge 5$ historical time periods to prevent low-confidence guesses.
+- ±1.96 standard error confidence band calculation expanding slightly over the future horizon.
+- Backend caching (`forecastCache`), rate limiting, and graceful 503 handling for service downtime.
+- Plain-English AI explanation sentence honestly caveating projections as estimates, not guarantees.
+- Extended Recharts interactive visualization combining historical actuals (solid), projected estimates (dashed purple), and shaded confidence interval envelope.
+- Prominent UX honesty notices, disclaimers, and interactive tooltips.
+
 ---
 
-## 🔮 Next: Phase 5
-- **AI Intelligence & Forecasting Engine**: Feed Phase 4 structured analytical JSON into LLMs for plain-English business explanations, executive summaries, and predictive forecasting.
+## 🔮 Next: Phase 7 & 8
+- **Phase 7: Chat-with-Data Engine**: Conversational Q&A querying datasets and statistical metrics.
+- **Phase 8: PDF Report Export**: Export executive summary dashboards into print-ready PDF reports.
+
