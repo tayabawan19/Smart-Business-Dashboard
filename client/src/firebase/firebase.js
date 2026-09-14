@@ -35,11 +35,16 @@ try {
 
   // Initialize Analytics if supported in the current environment
   if (typeof window !== 'undefined') {
-    isSupported().then((supported) => {
-      if (supported) {
-        analytics = getAnalytics(app);
-      }
-    });
+    isSupported()
+      .then((supported) => {
+        if (supported && app) {
+          analytics = getAnalytics(app);
+        }
+      })
+      .catch((err) => {
+        // Analytics may be blocked by browser privacy settings or adblockers
+        console.debug('[Firebase Analytics Notice]', err?.message || 'Analytics skipped');
+      });
   }
   console.log(`⚡ [Firebase] Initialized with project ID: ${firebaseConfig.projectId}`);
 } catch (error) {
